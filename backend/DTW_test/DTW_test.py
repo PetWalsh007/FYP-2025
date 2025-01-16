@@ -4,7 +4,6 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from dtw import dtw
 from time import time
 import pandas as pd
 
