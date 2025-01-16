@@ -1,3 +1,6 @@
+# test DTW implementation
+
+# Script setup to run incremental tests on increasing number of points
 
 import numpy as np
 import matplotlib.pyplot as plt
