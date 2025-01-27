@@ -15,11 +15,6 @@ class connectcls_sql_server:
         self.connection_url = connection_url
         self.connection_type = connection_type
 
-        
-    
-
-
- 
     def __str__(self):
         return f'Connection ID: {self.connection_id}, User ID: {self.user_id}, Connection Name: {self.connection_name}, Connection Type: {self.connection_type}, Connection URL: {self.connection_url}, Connection Port: {self.connection_port}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
     
@@ -36,8 +31,13 @@ class connectcls_sql_server:
             print(f"Database connection failed: {e}")
         return conn, cursor
     
-    def query(self, conn, cursor, query):
+    def query(self, cursor, query):
+        
         cursor.execute(query)
         rows = cursor.fetchall()
-        result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+        result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows] # Placeholder for returning the result
         return result
+    
+    def close_connection(self, conn):
+        conn.close()
+        print("Connection closed")
