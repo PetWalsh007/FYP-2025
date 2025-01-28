@@ -6,7 +6,9 @@
 from connections import *
 
 
-def main():
+
+def sql_server():
+
     # test sql server connection
 
 
@@ -26,6 +28,9 @@ def main():
     test_con.close_connection(conn)
 
 
+
+
+def postgres():
 
     # test postgres connection
     test_conn_postgres = connectcls_postgres(
@@ -48,6 +53,13 @@ def main():
     # close connection
     test_conn_postgres.close_connection(conn)
 
+
+
+    
+def main():
+
+    sql_server()
+    postgres()
 
 
 if __name__ == "__main__":
