@@ -5,43 +5,50 @@
 
 from connections import *
 
-test_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
 
-print(test_con.connect_str())
-
-conn, cursor = test_con.make_connection() # make connection and get cursor object
-
-query = "select * from testtable" # test query
-
-result = test_con.query(cursor, query)
-
-print(result)
-
-# close connection
-test_con.close_connection(conn)
+def main():
+    # test sql server connection
 
 
+    test_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
 
-# test postgres connection
-test_conn_postgres = connectcls_postgres(
-    driver_name="PostgreSQL Unicode",
-    server_name="192.168.1.55",
-    db_name="Test_DB",
-    connection_username="test_user",
-    connection_password="test_user"
-)
+    print(test_con.connect_str())
 
-conn, cursor = test_conn_postgres.make_connection() # make connection and get cursor object
+    conn, cursor = test_con.make_connection() # make connection and get cursor object
 
+    query = "select * from testtable" # test query
 
-query = "select * from plc_step_test limit 20" # test query
+    result = test_con.query(cursor, query)
 
-result = test_conn_postgres.query(cursor, query)
+    print(result)
 
-print(result)
-
-# close connection
-test_conn_postgres.close_connection(conn)
+    # close connection
+    test_con.close_connection(conn)
 
 
 
+    # test postgres connection
+    test_conn_postgres = connectcls_postgres(
+        driver_name="PostgreSQL Unicode",
+        server_name="192.168.1.55",
+        db_name="Test_DB",
+        connection_username="test_user",
+        connection_password="test_user"
+    )
+
+    conn, cursor = test_conn_postgres.make_connection() # make connection and get cursor object
+
+
+    query = "select * from plc_step_test limit 20" # test query
+
+    result = test_conn_postgres.query(cursor, query)
+
+    print(result)
+
+    # close connection
+    test_conn_postgres.close_connection(conn)
+
+
+
+if __name__ == "__main__":
+    main()
