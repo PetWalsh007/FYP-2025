@@ -33,9 +33,11 @@ class connectcls_sql_server:
             conn = pyodbc.connect(self.connect_str())
             print("Connection to SQL Server is successful")
             cursor = conn.cursor()
+            return conn, cursor
         except pyodbc.DatabaseError as e:
             print(f"Database connection failed: {e}")
-        return conn, cursor
+            return None, None
+        
     
     def query(self, cursor, query):
         
@@ -68,7 +70,7 @@ class connectcls_postgres:
         return  f"DRIVER={{{self.driver_name}}};SERVER={self.server_name};DATABASE={self.db_name};PORT={self.port};UID={self.connection_username};PWD={self.connection_password};"
     
     def make_connection(self):
-        print(f"Connection string used: {self.connect_str()}")
+        
         try:
             conn = pyodbc.connect(self.connect_str())
             print("Connection to PostgreSQL is successful")
@@ -76,7 +78,8 @@ class connectcls_postgres:
             return conn, cursor
         except pyodbc.Error as e:
             print(f"Database connection failed: {e}")
-            raise
+            
+            return None, None
 
 
     

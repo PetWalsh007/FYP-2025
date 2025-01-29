@@ -7,28 +7,28 @@ from connections import *
 
 
 
-def sql_server():
+def sql_server(query):
 
     # test sql server connection
 
 
-    test_con = connectcls_sql_server('SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
+    test_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
     print(test_con) # test __str__ method
     print(test_con.connect_str())
 
     conn, cursor = test_con.make_connection() # make connection and get cursor object
-    qry = "select * from testtable" # test query
-    result = test_con.query(cursor, qry)
-
-    print(result)
+    if conn:
+        result = test_con.query(cursor, query)
+        print(result)
 
     # close connection
-    test_con.close_connection(conn)
+    if conn:
+        test_con.close_connection(conn)
 
 
 
 
-def postgres():
+def postgres(query):
 
     # test postgres connection
     test_conn_postgres = connectcls_postgres(
@@ -43,22 +43,24 @@ def postgres():
 
 
     
-    qry = "select * from plc_step_test limit 20"
-    result = test_conn_postgres.query(cursor, qry)
-
-    print(result)
+    if conn:
+        result = test_conn_postgres.query(cursor, query)
+        print(result)
 
     # close connection
-    test_conn_postgres.close_connection(conn)
+    if conn:
+        test_conn_postgres.close_connection(conn)
 
 
 
     
 def main():
-
-    sql_server()
-    #postgres()
+    qry = "select * from testtable"
+    sql_server(qry)
+    qry = "select * from plc_step_test limit 20"
+    postgres(qry)
 
 
 if __name__ == "__main__":
     main()
+    print("Done")
