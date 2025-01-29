@@ -16,7 +16,7 @@ class connectcls_sql_server:
         self.connection_type = connection_type
 
     def __str__(self):
-        return f'Connection ID: {self.connection_id}, User ID: {self.user_id}, Connection Name: {self.connection_name}, Connection Type: {self.connection_type}, Connection URL: {self.connection_url}, Connection Port: {self.connection_port}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
+        return f'Connection ID: {self.connection_id}, User ID: {self.user_id}, Connection Name: {self.connection_name}, Connection Type: {self.connection_type}, Connection URL: {self.connection_url}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
     
     def connect_str(self):
         """

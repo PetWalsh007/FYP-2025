@@ -12,15 +12,13 @@ def sql_server():
     # test sql server connection
 
 
-    test_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
-
+    test_con = connectcls_sql_server('SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
+    print(test_con) # test __str__ method
     print(test_con.connect_str())
 
     conn, cursor = test_con.make_connection() # make connection and get cursor object
-
-    query = "select * from testtable" # test query
-
-    result = test_con.query(cursor, query)
+    qry = "select * from testtable" # test query
+    result = test_con.query(cursor, qry)
 
     print(result)
 
@@ -44,9 +42,9 @@ def postgres():
     conn, cursor = test_conn_postgres.make_connection() # make connection and get cursor object
 
 
-    query = "select * from plc_step_test limit 20" # test query
-
-    result = test_conn_postgres.query(cursor, query)
+    
+    qry = "select * from plc_step_test limit 20"
+    result = test_conn_postgres.query(cursor, qry)
 
     print(result)
 
@@ -59,7 +57,7 @@ def postgres():
 def main():
 
     sql_server()
-    postgres()
+    #postgres()
 
 
 if __name__ == "__main__":
