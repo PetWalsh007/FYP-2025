@@ -4,7 +4,23 @@
 # Here we will take the paramters passed from inside the system and setup the end points for the database
 
 from connections import *
+from flask import Flask, jsonify, request
 
+
+app = Flask(__name__)
+@app.route('/data', methods=['GET'])
+def get_data():
+    fil_condition = request.args.get('filter', '1=1') # Default to no filter
+    limit = request.args.get('limit', 10)
+    table_name = request.args.get('table_name', 'testtable')
+    
+    query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
+    print(f"Executing query: {query}")
+    result = sql_server(query)
+    
+    return jsonify(result)
+
+app.add_url_rule('/data', 'get_data', get_data, methods=['GET'])
 
 
 def sql_server(query):
@@ -23,6 +39,8 @@ def sql_server(query):
     # close connection
     if conn:
         test_con.close_connection(conn)
+
+    return result
 
 
 
@@ -59,6 +77,5 @@ def main():
     postgres(qry)
 
 
-if __name__ == "__main__":
-    main()
-    print("Done")
+if __name__ == '__main__':
+    app.run(debug=True)
