@@ -11,11 +11,13 @@ def sql_server(query):
     # test sql server connection
     test_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
 
-    conn, cursor = test_con.make_connection() # make connection and get cursor object
+    conn, cursor, errors = test_con.make_connection() # make connection and get cursor object
     if conn:
         result = test_con.query(cursor, query)
         if result:
             print(result)
+    if errors:
+        print(errors)
 
 
     # close connection

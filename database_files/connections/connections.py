@@ -33,13 +33,11 @@ class connectcls_sql_server:
             conn = pyodbc.connect(self.connect_str())
             print("Connection to SQL Server is successful")
             cursor = conn.cursor()
-            return conn, cursor
+            return conn, cursor, None
         except pyodbc.OperationalError as e:
-            print(f"Operational error: {e}")
-            return None, None
+            return None, None , e
         except pyodbc.Error as e:
-            print(f"Error: {e}")
-            return None, None
+            return None, None , e
         
     
     def query(self, cursor, query):
