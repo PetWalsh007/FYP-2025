@@ -12,15 +12,30 @@ app = Flask(__name__)
 def get_data():
     fil_condition = request.args.get('filter', '1=1') # Default to no filter
     limit = request.args.get('limit', 10)
-    table_name = request.args.get('table_name', 'testtable')
-    
-    query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
-    print(f"Executing query: {query}")
-    result = sql_server(query)
-    
-    return jsonify(result)
+    table_name = request.args.get('table_name', None)
+    data_base = request.args.get('database', None)
+    if data_base == 'sql_server':
+            
+        if table_name:
+            query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
 
-app.add_url_rule('/data', 'get_data', get_data, methods=['GET'])
+            result = sql_server(query)
+
+            return jsonify(result)
+        else:
+            return jsonify({"error": "No table name provided"})
+    elif data_base == 'postgres':
+        if table_name:
+            query = f"SELECT * from {table_name} WHERE {fil_condition} LIMIT {limit}"
+            result = postgres(query)
+
+            return jsonify(result)
+        else:
+            return jsonify({"error": "No table name provided"})
+    else:
+        return jsonify({"error": "No database provided"})
+    
+
 
 
 def sql_server(query):
@@ -31,7 +46,7 @@ def sql_server(query):
     if conn:
         result = test_con.query(cursor, query)
         if result:
-            print(result)
+            pass
     if errors:
         print(errors)
 
@@ -69,13 +84,4 @@ def postgres(query):
         test_conn_postgres.close_connection(conn)
 
 
-    
-def main():
-    qry = "select * from testtble"
-    sql_server(qry)
-    qry = "select * from plc_step_test limit 20"
-    postgres(qry)
 
-
-if __name__ == '__main__':
-    app.run(debug=True)
