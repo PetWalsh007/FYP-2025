@@ -34,17 +34,29 @@ class connectcls_sql_server:
             print("Connection to SQL Server is successful")
             cursor = conn.cursor()
             return conn, cursor
-        except pyodbc.DatabaseError as e:
-            print(f"Database connection failed: {e}")
+        except pyodbc.OperationalError as e:
+            print(f"Operational error: {e}")
+            return None, None
+        except pyodbc.Error as e:
+            print(f"Error: {e}")
             return None, None
         
     
     def query(self, cursor, query):
-        
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows] # Placeholder for returning the result
-        return result
+        try: 
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+            return result
+        except pyodbc.ProgrammingError as e:
+            print(f"Query failed: {e}")
+            return [{"error": "Query failure - Check your SQL syntax"}]
+        except pyodbc.DatabaseError as e:
+            print(f"Database failure: {e}")
+            return [{"error": "Database failure - Check your database connection and query"}]
+        except pyodbc.Error as e:
+            print(f"Query failed: {e}")
+            return [{"error": f"General error - {str(e)}"}]
     
     def close_connection(self, conn):
         conn.close()
@@ -75,25 +87,37 @@ class connectcls_postgres:
             conn = pyodbc.connect(self.connect_str())
             print("Connection to PostgreSQL is successful")
             cursor = conn.cursor()
-            return conn, cursor
+            return conn, cursor, None
+        except pyodbc.OperationalError as e:
+            #print(f"Operational error: {e}")
+            return None, None, e
         except pyodbc.Error as e:
-            print(f"Database connection failed: {e}")
-            
-            return None, None
+            #print(f"Error - failed connection: {e}")
+            return None, None, e
 
 
     
     def query(self, cursor, query):
-        
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
-        return result
+        try:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+            return result
+        except pyodbc.ProgrammingError as e:
+            print(f"Query failed: {e}")
+            return [{"error": "Query failure - Check your SQL syntax"}]
+        except pyodbc.DatabaseError as e:
+            print(f"Database failure: {e}")
+            return [{"error": "Database failure - Check your database connection and query"}]
+        except pyodbc.Error as e:
+            print(f"Query failed: {e}")
+            return [{"error": f"General error - {str(e)}"}]
+
+
     
     def close_connection(self, conn):
         conn.close()
         print("Connection closed")
-
 
 
    
