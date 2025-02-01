@@ -9,6 +9,7 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 @app.route('/data', methods=['GET'])
+
 def get_data():
     fil_condition = request.args.get('filter', '1=1') # Default to no filter
     limit = request.args.get('limit', 10)
@@ -20,13 +21,14 @@ def get_data():
             query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
 
             result = sql_server(query)
-
+  
             return jsonify(result)
+        
         else:
             return jsonify({"error": "No table name provided"})
     elif data_base == 'postgres':
         if table_name:
-            query = f"SELECT * from {table_name} WHERE {fil_condition} LIMIT {limit}"
+            query = f"SELECT * from {table_name} LIMIT {limit}"
             result = postgres(query)
 
             return jsonify(result)
@@ -49,6 +51,7 @@ def sql_server(query):
             pass
     if errors:
         print(errors)
+        return errors
 
 
     # close connection
@@ -78,10 +81,13 @@ def postgres(query):
             print(result)
     if errors:
         print(errors)
+        return errors
         
     # close connection
     if conn:
         test_conn_postgres.close_connection(conn)
+
+    return result
 
 
 
