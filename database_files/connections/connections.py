@@ -31,13 +31,20 @@ class connectcls_sql_server:
     def make_connection(self):
         try:
             conn = pyodbc.connect(self.connect_str())
-            print("Connection to SQL Server is successful")
+            
             cursor = conn.cursor()
             return conn, cursor, None
         except pyodbc.OperationalError as e:
-            return None, None , e
+            return None, None, [{"error": "Operational error - Check your database connection and server status"}]
+        except pyodbc.IntegrityError as e:
+            return None, None, [{"error": "Integrity error - Check your data integrity constraints"}]
+        except pyodbc.ProgrammingError as e:
+            return None, None, [{"error": "Programming error - Check your SQL syntax and table/column names"}]
+        except pyodbc.DatabaseError as e:
+            return None, None, [{"error": "Database error - General database error occurred"}]
         except pyodbc.Error as e:
-            return None, None , e
+            return None, None, [{"error": f"General error - {str(e)}"}]
+
         
     
     def query(self, cursor, query):
@@ -87,11 +94,15 @@ class connectcls_postgres:
             cursor = conn.cursor()
             return conn, cursor, None
         except pyodbc.OperationalError as e:
-            #print(f"Operational error: {e}")
-            return None, None, e
+            return None, None, [{"error": "Operational error - Check your database connection and server status"}]
+        except pyodbc.IntegrityError as e:
+            return None, None, [{"error": "Integrity error - Check your data integrity constraints"}]
+        except pyodbc.ProgrammingError as e:
+            return None, None, [{"error": "Programming error - Check your SQL syntax and table/column names"}]
+        except pyodbc.DatabaseError as e:
+            return None, None, [{"error": "Database error - General database error occurred"}]
         except pyodbc.Error as e:
-            #print(f"Error - failed connection: {e}")
-            return None, None, e
+            return None, None, [{"error": f"General error - {str(e)}"}]
 
 
     
