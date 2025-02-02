@@ -4,67 +4,59 @@
 # Here we will take the paramters passed from inside the system and setup the end points for the database
 
 from connections import *
-from flask import Flask, jsonify, request
+from fastapi import FastAPI
 
+app = FastAPI()
 
-app = Flask(__name__)
-@app.route('/data', methods=['GET'])
-
-def get_data():
-    fil_condition = request.args.get('filter', '1=1') # Default to no filter
-    limit = request.args.get('limit', 10)
-    table_name = request.args.get('table_name', None)
-    data_base = request.args.get('database', None)
-    if data_base == 'sql_server':
-            
+@app.get("/data")
+def get_data(database: str ="null", table_name: str = "Error", fil_condition: str = '1=1', limit: int = 10):
+    # Check if the database is SQL Server
+    if database == 'sql_server':
         if table_name:
             query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
-
             result = sql_server(query)
-  
-            return jsonify(result)
-        
+            return result
         else:
-            return jsonify({"error": "No table name provided"})
-    elif data_base == 'postgres':
+            return {"error": "No table name provided"}
+    # Check if the database is PostgreSQL
+    elif database == 'postgres':
         if table_name:
             query = f"SELECT * from {table_name} LIMIT {limit}"
             result = postgres(query)
-
-            return jsonify(result)
+            return result
         else:
-            return jsonify({"error": "No table name provided"})
+            return {"error": "No table name provided"}
     else:
-        return jsonify({"error": "No database provided"})
+        return {"error": "No database provided"}
     
-
-
-
+    
+# Function to query SQL Server database
 def sql_server(query):
-    # test sql server connection
+    # Test SQL Server connection
     test_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
 
-    conn, cursor, errors = test_con.make_connection() # make connection and get cursor object
+    # Make connection and get cursor object
+    conn, cursor, errors = test_con.make_connection()
     if conn:
+        # Execute query
         result = test_con.query(cursor, query)
         if result:
             pass
     if errors:
+        # Print errors if any
         print(errors)
         return errors
 
-
-    # close connection
+    # Close connection
     if conn:
         test_con.close_connection(conn)
 
     return result
 
-
-
+# Function to query PostgreSQL database
 def postgres(query):
 
-    # test postgres connection
+    # Test PostgreSQL connection
     test_conn_postgres = connectcls_postgres(
         driver_name="PostgreSQL Unicode",
         server_name="192.168.1.55",
@@ -73,21 +65,22 @@ def postgres(query):
         connection_password="test_user"
     )
 
-    conn, cursor, errors = test_conn_postgres.make_connection() # make connection and get cursor object
+    # Make connection and get cursor object
+    conn, cursor, errors = test_conn_postgres.make_connection()
 
     if conn and not errors:
+        # Execute query
         result = test_conn_postgres.query(cursor, query)
         if result:
             print(result)
     if errors:
+        # Print errors if any
         print(errors)
         return errors
         
-    # close connection
+    # Close connection
     if conn:
         test_conn_postgres.close_connection(conn)
 
     return result
-
-
 
