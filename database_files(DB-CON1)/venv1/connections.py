@@ -1,4 +1,12 @@
 # Class definition for the Connections class
+
+'''
+This module for import into main_abstration.py contains the class definitions for the connections to various databases,
+such as SQL Server and PostgreSQL.
+
+Class is also set to define differnt sytnax for various databases.
+
+'''
 import pyodbc
 
 class connectcls_sql_server:
@@ -35,11 +43,11 @@ class connectcls_sql_server:
             cursor = conn.cursor()
             return conn, cursor, None
         except pyodbc.OperationalError as e:
-            return None, None, [{"error": "Operational error - Check your database connection and server status"}]
+            return None, None, [{"error": "Operational error - Check database connection and server status"}]
         except pyodbc.IntegrityError as e:
-            return None, None, [{"error": "Integrity error - Check your data integrity constraints"}]
+            return None, None, [{"error": "Integrity error - Check data integrity constraints"}]
         except pyodbc.ProgrammingError as e:
-            return None, None, [{"error": "Programming error - Check your SQL syntax and table/column names"}]
+            return None, None, [{"error": "Programming error - Check SQL syntax and table/column names"}]
         except pyodbc.DatabaseError as e:
             return None, None, [{"error": "Database error - General database error occurred"}]
         except pyodbc.Error as e:
@@ -55,10 +63,10 @@ class connectcls_sql_server:
             return result
         except pyodbc.ProgrammingError as e:
             print(f"Query failed: {e}")
-            return [{"error": "Query failure - Check your SQL syntax"}]
+            return [{"error": "Query failure - Check SQL syntax"}]
         except pyodbc.DatabaseError as e:
             print(f"Database failure: {e}")
-            return [{"error": "Database failure - Check your database connection and query"}]
+            return [{"error": "Database failure - Check database connection and query"}]
         except pyodbc.Error as e:
             print(f"Query failed: {e}")
             return [{"error": f"General error - {str(e)}"}]
@@ -94,11 +102,11 @@ class connectcls_postgres:
             cursor = conn.cursor()
             return conn, cursor, None
         except pyodbc.OperationalError as e:
-            return None, None, [{"error": "Operational error - Check your database connection and server status"}]
+            return None, None, [{"error": "Operational error - Check database connection and server status"}]
         except pyodbc.IntegrityError as e:
-            return None, None, [{"error": "Integrity error - Check your data integrity constraints"}]
+            return None, None, [{"error": "Integrity error - Check data integrity constraints"}]
         except pyodbc.ProgrammingError as e:
-            return None, None, [{"error": "Programming error - Check your SQL syntax and table/column names"}]
+            return None, None, [{"error": "Programming error - Check SQL syntax and table/column names"}]
         except pyodbc.DatabaseError as e:
             return None, None, [{"error": "Database error - General database error occurred"}]
         except pyodbc.Error as e:
@@ -114,10 +122,10 @@ class connectcls_postgres:
             return result
         except pyodbc.ProgrammingError as e:
             print(f"Query failed: {e}")
-            return [{"error": "Query failure - Check your SQL syntax"}]
+            return [{"error": "Query failure - Check SQL syntax"}]
         except pyodbc.DatabaseError as e:
             print(f"Database failure: {e}")
-            return [{"error": "Database failure - Check your database connection and query"}]
+            return [{"error": "Database failure - Check database connection and query"}]
         except pyodbc.Error as e:
             print(f"Query failed: {e}")
             return [{"error": f"General error - {str(e)}"}]
@@ -127,11 +135,3 @@ class connectcls_postgres:
     def close_connection(self, conn):
         conn.close()
         print("Connection closed")
-
-
-   
-
-
-
-
- 

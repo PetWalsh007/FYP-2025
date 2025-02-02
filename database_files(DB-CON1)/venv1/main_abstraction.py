@@ -1,15 +1,17 @@
-# Main file for the abstraction layer
-# This file is responsible for the abstraction layer of the database connections and queries
+'''
 
-# Here we will take the paramters passed from inside the system and setup the end points for the database
+Main file for the abstraction layer 
+This file is responsible for the abstraction layer of the system where general connections and queries are passed to 
+and passed to respective database connections
 
+'''
 from connections import *
 from fastapi import FastAPI
 
 app = FastAPI()
 
 @app.get("/data")
-def get_data(database: str ="null", table_name: str = "Error", fil_condition: str = '1=1', limit: int = 10):
+def get_data(database: str ="null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10):
     # Check if the database is SQL Server
     if database == 'sql_server':
         if table_name:
