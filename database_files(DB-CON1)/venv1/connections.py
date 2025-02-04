@@ -1,4 +1,4 @@
-# Class definition for the Connections class
+# Class definition for the Connections class 
 
 '''
 This module for import into main_abstration.py contains the class definitions for the connections to various databases,
@@ -113,12 +113,12 @@ class connectcls_postgres:
             return None, None, [{"error": f"General error - {str(e)}"}]
 
 
-    
     def query(self, cursor, query):
         try:
             cursor.execute(query)
             rows = cursor.fetchall()
             result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+
             return result
         except pyodbc.ProgrammingError as e:
             print(f"Query failed: {e}")
