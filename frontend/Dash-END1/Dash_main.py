@@ -10,7 +10,7 @@ import requests
 import pandas as pd
 
 app = dash.Dash(__name__)
-
+server = app.server  # Expose the Flask server for Gunicorn
 
 dev_style = {
     'textAlign': 'center',
@@ -138,7 +138,6 @@ def get_data_all(pts):
     return response.json()
 
 
-
 if __name__ == '__main__':
  
-    app.run_server(host='0.0.0.0',debug=True,port=8050) 
+    app.run_server(host='0.0.0.0',debug=True) 
