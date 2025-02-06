@@ -25,6 +25,7 @@ class connectcls_sql_server:
 
         # Placeholder testing for initalising and establishing a connection as the class is initalised - to allow reuse of connections
         # self.con_string = self.connect_str() # call connect string func on initalisation of object 
+        # self.conn, self.cursor = self.make_connection
 
 
     def __str__(self):
