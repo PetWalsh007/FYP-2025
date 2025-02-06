@@ -23,6 +23,10 @@ class connectcls_sql_server:
         self.connection_url = connection_url
         self.connection_type = connection_type
 
+        # Placeholder testing for initalising and establishing a connection as the class is initalised - to allow reuse of connections
+        # self.con_string = self.connect_str() # call connect string func on initalisation of object 
+
+
     def __str__(self):
         return f'Connection ID: {self.connection_id}, User ID: {self.user_id}, Connection Name: {self.connection_name}, Connection Type: {self.connection_type}, Connection URL: {self.connection_url}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
     
