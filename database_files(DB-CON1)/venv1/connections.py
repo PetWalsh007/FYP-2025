@@ -57,8 +57,9 @@ class connectcls_sql_server:
     
     def query(self, cursor, query):
         try: 
-            cursor.execute(query)
-            rows = cursor.fetchall()
+            cursor.execute(query)  # Execute the query
+            rows = cursor.fetchall()  # Fetch all rows
+            # Convert rows to list of dictionaries
             result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
             return result
         except pyodbc.ProgrammingError as e:
@@ -112,13 +113,12 @@ class connectcls_postgres:
         except pyodbc.Error as e:
             return None, None, [{"error": f"General error - {str(e)}"}]
 
-
     def query(self, cursor, query):
         try:
-            cursor.execute(query)
-            rows = cursor.fetchall()
+            cursor.execute(query)  # Execute the query
+            rows = cursor.fetchall()  # Fetch all rows
+            # Convert rows to list of dictionaries
             result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
-
             return result
         except pyodbc.ProgrammingError as e:
             print(f"Query failed: {e}")
@@ -130,8 +130,6 @@ class connectcls_postgres:
             print(f"Query failed: {e}")
             return [{"error": f"General error - {str(e)}"}]
 
-
-    
     def close_connection(self, conn):
-        conn.close()
+        conn.close()  # Close the connection
         print("Connection closed")
