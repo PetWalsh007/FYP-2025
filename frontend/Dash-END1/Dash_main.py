@@ -151,6 +151,22 @@ def restart_server(submit_n_clicks):
     return ''
 
 
+@app.callback(
+    Output('save-confirmation', 'children'),
+    [Input('save-config-button', 'n_clicks')],
+    [State('config-textarea', 'value')]
+)
+def save_config_file(n_clicks, config_text):
+    if n_clicks > 0:
+        config_data = json.loads(config_text)
+        save_config(config_data)
+        # reload the config into config global variable
+        load_config_call()
+        return 'Config file saved successfully!'
+    return ''
+
+
+
 # This callback is used to update the textarea with the current configuration data 
 @app.callback(
     Output('config-textarea', 'value'),
@@ -224,18 +240,6 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
     return dash.no_update, dash.no_update, dash.no_update, dash.no_update
    
 
-@app.callback(
-    Output('save-confirmation', 'children'),
-    [Input('save-config-button', 'n_clicks')],
-    [State('config-textarea', 'value')]
-)
-def save_config_file(n_clicks, config_text):
-    if n_clicks > 0:
-        config_data = json.loads(config_text)
-        save_config(config_data)
-        return 'Config file saved successfully!'
-    return ''
-
 
 
 
@@ -252,12 +256,18 @@ def generate_csv_data(data_to_download):
 def get_data(n_clicks, db_sel):
     # This function will send a request to the FastAPI server to get data from the database
 
+    postgres_ip = config['databases']['postgres']['server']['ip']
+    postgres_table = config['databases']['postgres']['database']['table']
+
     if db_sel == 'postgres':
-        response = requests.get(f'http://192.168.1.81:8000/data?database=postgres&table_name=plc_step_test&limit={n_clicks}') # simple fixed request URL for now
+        response = requests.get(f'http://{postgres_ip}:8000/data?database=postgres&table_name={postgres_table}&limit={n_clicks}') # updated to take the table name from the config file
     elif db_sel == 'sql_server':
         response = requests.get(f'http://192.168.1.81:8000/data?database=sql_server&table_name=testtable&limit={n_clicks}')
     else:
         response = "No data available"
+    
+    if response.status_code == 500:
+        return [{"Error": "Error in getting data"}]
     return response.json()
 
 def get_data_all(pts, db_sel):
