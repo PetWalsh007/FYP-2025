@@ -30,8 +30,6 @@ def shutdown():
 
 
 
-
-
 @app.get("/data")
 def get_data(database: str ="null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10):
     # Check if the database is SQL Server
