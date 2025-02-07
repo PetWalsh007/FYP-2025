@@ -1,0 +1,24 @@
+{
+    "databases": {
+        "postgres": {
+            "server": {
+                "ip": "192.168.1.81",
+                "port": 8000
+            },
+            "database": {
+                "name": "postgres",
+                "table": "plc_step_test"
+            }
+        },
+        "database_2": {
+            "server": {
+                "ip": "XXXXXX",
+                "port": 0
+            },
+            "database": {
+                "name": "192dw",
+                "table": "Xxx"
+            }
+        }
+    }
+}

@@ -8,8 +8,10 @@ Class is also set to define differnt sytnax for various databases.
 
 '''
 import pyodbc
+import threading
 
 class connectcls_sql_server:
+    _lock = threading.Lock()  # Preventing any race conditions
 
     def __init__(self, driver_name , server_name, db_name,connection_username, connection_password, connection_id=None, user_id=None, connection_name=None,  connection_url=None, connection_type=None):
         self.driver_name = driver_name
@@ -23,10 +25,10 @@ class connectcls_sql_server:
         self.connection_url = connection_url
         self.connection_type = connection_type
 
+        
         # Placeholder testing for initalising and establishing a connection as the class is initalised - to allow reuse of connections
-        # self.con_string = self.connect_str() # call connect string func on initalisation of object 
-        # self.conn, self.cursor = self.make_connection
-
+         
+        self.conn, self.cursor, self.con_err = self.make_connection()
 
     def __str__(self):
         return f'Connection ID: {self.connection_id}, User ID: {self.user_id}, Connection Name: {self.connection_name}, Connection Type: {self.connection_type}, Connection URL: {self.connection_url}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
@@ -42,31 +44,31 @@ class connectcls_sql_server:
         return  f'DRIVER={{{self.driver_name}}};SERVER={self.server_name};DATABASE={self.db_name};UID={self.connection_username};PWD={self.connection_password};'
     
     def make_connection(self):
-        try:
-            conn = pyodbc.connect(self.connect_str())
-            
-            cursor = conn.cursor()
-            return conn, cursor, None
-        except pyodbc.OperationalError as e:
-            return None, None, [{"error": "Operational error - Check database connection and server status"}]
-        except pyodbc.IntegrityError as e:
-            return None, None, [{"error": "Integrity error - Check data integrity constraints"}]
-        except pyodbc.ProgrammingError as e:
-            return None, None, [{"error": "Programming error - Check SQL syntax and table/column names"}]
-        except pyodbc.DatabaseError as e:
-            return None, None, [{"error": "Database error - General database error occurred"}]
-        except pyodbc.Error as e:
-            return None, None, [{"error": f"General error - {str(e)}"}]
+        with self._lock:  # Prevents race conditions - with statement is used to ensure the lock is released after the connection is made
+            try:
+                conn = pyodbc.connect(self.connect_str())
+                
+                cursor = conn.cursor()
+                return conn, cursor, None
+            except pyodbc.OperationalError as e:
+                return None, None, [{"error": "Operational error - Check database connection and server status"}]
+            except pyodbc.IntegrityError as e:
+                return None, None, [{"error": "Integrity error - Check data integrity constraints"}]
+            except pyodbc.ProgrammingError as e:
+                return None, None, [{"error": "Programming error - Check SQL syntax and table/column names"}]
+            except pyodbc.DatabaseError as e:
+                return None, None, [{"error": "Database error - General database error occurred"}]
+            except pyodbc.Error as e:
+                return None, None, [{"error": f"General error - {str(e)}"}]
 
         
     
-    def query(self, cursor, query):
+    def query(self, query):
         try: 
-            cursor.execute(query)  # Execute the query
-            rows = cursor.fetchall()  # Fetch all rows
-            # Convert rows to list of dictionaries
-            result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
-            return result
+            with self.conn.cursor() as c:  # Contex Manager on cleanup of cursor 
+                c.execute(query)
+                rows = c.fetchall()
+                return [dict(zip([column[0] for column in c.description], row)) for row in rows]
         except pyodbc.ProgrammingError as e:
             print(f"Query failed: {e}")
             return [{"error": "Query failure - Check SQL syntax"}]
@@ -77,8 +79,8 @@ class connectcls_sql_server:
             print(f"Query failed: {e}")
             return [{"error": f"General error - {str(e)}"}]
     
-    def close_connection(self, conn):
-        conn.close()
+    def close_connection(self):
+        self.conn.close()
         print("Connection closed")
 
 # class for the connections to postgresql
@@ -118,12 +120,13 @@ class connectcls_postgres:
         except pyodbc.Error as e:
             return None, None, [{"error": f"General error - {str(e)}"}]
 
+
     def query(self, cursor, query):
         try:
-            cursor.execute(query)  # Execute the query
-            rows = cursor.fetchall()  # Fetch all rows
-            # Convert rows to list of dictionaries
+            cursor.execute(query)
+            rows = cursor.fetchall()
             result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+
             return result
         except pyodbc.ProgrammingError as e:
             print(f"Query failed: {e}")
@@ -135,6 +138,8 @@ class connectcls_postgres:
             print(f"Query failed: {e}")
             return [{"error": f"General error - {str(e)}"}]
 
+
+    
     def close_connection(self, conn):
-        conn.close()  # Close the connection
+        conn.close()
         print("Connection closed")
