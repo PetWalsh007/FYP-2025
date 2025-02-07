@@ -1,5 +1,8 @@
 '''
 This file is the main Dash front end file for the system. It is responsible for the main layout of the Dash portion of the system.
+
+https://dash.plotly.com/ for more information on Dash and how the Dash framework works
+
 '''
 
 import dash
@@ -9,6 +12,7 @@ from dash.dependencies import Input, Output, State
 import requests
 import pandas as pd
 import json
+import subprocess
 
 # Load the existing config
 CONFIG_FILE = "config.json"
@@ -74,6 +78,8 @@ app.layout = html.Div([
 
 
 # Define the layout for the main page
+# https://dash.plotly.com/dash-html-components for more information on the HTML components
+# https://dash.plotly.com/dash-core-components for more information on the DCC's
 main_page_layout = html.Div([
     html.Div(className='row', children='Real-Time Adaptive Data Analytics and Visualisation Platform for Industrial Manufacturing Execution Systems',
              style=dev_style),
@@ -108,10 +114,41 @@ page2_layout = html.Div([
         value=json.dumps(config, indent=4),
         style={'width': '100%', 'height': 300},
     ),
-    html.Button('Save Config', id='save-config-button', n_clicks=0),
+    dcc.ConfirmDialog(
+        id='confirm-danger',
+        message='This will restart the server for all users! Are you sure you want to continue?',
+    ),
+    html.Button('Save Config File to Server', id='save-config-button', n_clicks=0),
+    html.Button('Restart Dash Server', id='restart-system-button', n_clicks=0),
+    html.Div(id='restart-confirmation', style={'marginTop': '20px'}),
     html.Div(id='save-confirmation', style={'marginTop': '20px'}),
     html.A('Go back to main page', href='/')
+    
 ])
+
+# https://dash.plotly.com/dash-core-components/confirmdialog for more information on the ConfirmDialog component
+
+@app.callback(
+    Output('confirm-danger', 'displayed'),
+    [Input('restart-system-button', 'n_clicks')]
+)
+def restart_server_confirm(n_clicks):
+    if n_clicks > 0:
+        # Command to restart the server
+        return True
+       
+    return ''
+
+@app.callback(
+    Output('restart-confirmation', 'children'),
+    [Input('confirm-danger', 'submit_n_clicks')]
+)
+def restart_server(submit_n_clicks):
+    if submit_n_clicks:
+        subprocess.Popen(["sudo", "systemctl", "restart", "gunicorn"])
+        return 'Server restarted successfully!'
+
+    return ''
 
 
 # This callback is used to update the textarea with the current configuration data 
@@ -214,6 +251,7 @@ def generate_csv_data(data_to_download):
 
 def get_data(n_clicks, db_sel):
     # This function will send a request to the FastAPI server to get data from the database
+
     if db_sel == 'postgres':
         response = requests.get(f'http://192.168.1.81:8000/data?database=postgres&table_name=plc_step_test&limit={n_clicks}') # simple fixed request URL for now
     elif db_sel == 'sql_server':
