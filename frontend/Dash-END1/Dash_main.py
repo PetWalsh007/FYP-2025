@@ -13,6 +13,7 @@ import requests
 import pandas as pd
 import json
 import subprocess
+import time
 
 # Load the existing config
 CONFIG_FILE = "config.json"
@@ -123,7 +124,7 @@ page2_layout = html.Div([
     ),
     dcc.ConfirmDialog(
         id='confirm-danger',
-        message='This will restart the server for all users! Are you sure you want to continue?',
+        message='This will restart the server for all users! If you continue, Please wait for confirmation message.',
     ),
     html.Button('Save Config File to Server', id='save-config-button', n_clicks=0),
     html.Button('Restart Dash Server', id='restart-system-button', n_clicks=0),
@@ -153,6 +154,7 @@ def restart_server_confirm(n_clicks):
 def restart_server(submit_n_clicks):
     if submit_n_clicks:
         subprocess.Popen(["sudo", "systemctl", "restart", "gunicorn"])
+        time.sleep(2) # for a wait time to allow the server to restart
         return 'Server restarted successfully!'
 
     return ''
