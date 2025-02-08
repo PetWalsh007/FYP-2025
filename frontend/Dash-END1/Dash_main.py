@@ -263,28 +263,25 @@ def generate_csv_data(data_to_download):
 def get_data(n_clicks, db_sel):
     # This function will send a request to the FastAPI server to get data from the database
 
-    postgres_ip = config['databases']['postgres']['server']['ip']
-    postgres_table = config['databases']['postgres']['database']['table']
+    # use the config file to get the table name and database name
+    database_table_sel = config['databases'][db_sel]['database']['table']
 
-    if db_sel == 'postgres':
-        response = requests.get(f'http://{postgres_ip}:8000/data?database=postgres&table_name={postgres_table}&limit={n_clicks}') # updated to take the table name from the config file
-    elif db_sel == 'sql_server':
-        response = requests.get(f'http://192.168.1.81:8000/data?database=sql_server&table_name=testtable&limit={n_clicks}')
-    else:
-        response = "No data available"
-    
+    response = requests.get(f'http://192.168.1.81:8000/data?database={db_sel}&table_name={database_table_sel}&limit={n_clicks}') # updated to take the table name from the config file
+
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]
     return response.json()
 
 def get_data_all(pts, db_sel):
+
+    #using config file to get the table name
   
-    if db_sel == 'postgres':
-        response = requests.get(f'http://192.168.1.81:8000/data?database=postgres&table_name=plc_step_test&limit={pts}') 
-    elif db_sel == 'sql_server':
-        response = requests.get(f'http://192.168.1.81:8000/data?database=sql_server&table_name=testtable&limit={pts}')
-    else:
-        response = "No data available"
+    database_table_sel = config['databases'][db_sel]['database']['table']
+
+    response = requests.get(f'http://192.168.1.81:8000/data?database={db_sel}&table_name={database_table_sel}&limit={pts}') # updated to take the table name from the config file
+
+    if response.status_code == 500:
+        return [{"Error": "Error in getting data"}]
     return response.json()
 
 
