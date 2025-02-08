@@ -25,13 +25,15 @@ def save_config(config_data):
     with open(CONFIG_FILE, "w") as file:
         json.dump(config_data, file, indent=4)
 
+
 def load_config_call():
     global config
     config = load_config()
-
+     
 load_config_call()
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__,
+    requests_pathname_prefix='/dash/')
 app.title = 'RTA MES'
 server = app.server  # Expose the Flask server for Gunicorn
 
@@ -77,31 +79,36 @@ app.layout = html.Div([
 ], style={'fontFamily': 'Times New Roman', 'padding': '40px'})
 
 
+
+
 # Define the layout for the main page
 # https://dash.plotly.com/dash-html-components for more information on the HTML components
 # https://dash.plotly.com/dash-core-components for more information on the DCC's
-main_page_layout = html.Div([
-    html.Div(className='row', children='Real-Time Adaptive Data Analytics and Visualisation Platform for Industrial Manufacturing Execution Systems',
-             style=dev_style),
-    html.Div([
-        html.Button('Get Data', id='get-data-button', n_clicks=0, className='button'),
-        html.Button('Get X Data', id='get-all-data-button', n_clicks=0, className='button'),
-        html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button'),
-        html.Button("Download CSV", id="btn_csv"),
-        html.Button("Config", id="config-button", n_clicks=0, className='button'),
-        dcc.Download(id="download-dataframe-csv"),
-    ], style=button_style),
-    
-    html.Div([
-        html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
-        dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
-        html.Label('Select the database to query:', style={'fontSize': '18px', 'marginRight': '10px', 'marginLeft': '15px'}),
-        dcc.Dropdown(id='database', options=[{'label': 'Postgres', 'value': 'postgres'}, {'label': 'SQL Server', 'value': 'sql_server'}], value='postgres', style={'fontSize': '18px', 'width': '170px'}),
-    ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex','justifyContent': 'center'}),
-    html.Div(id='output-container', style=text_style2),
-    html.Div(id='output-container-all', style=text_style1),
-    dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0}),  # Store to keep track of click counts
-])
+
+# Updated 08/02 to a function to allow for easier testing of dynamic content in dropdown from JSON config
+def main_page_layout():
+    return html.Div([
+        html.Div(className='row', children='Real-Time Adaptive Data Analytics and Visualisation Platform for Industrial Manufacturing Execution Systems',
+                style=dev_style),
+        html.Div([
+            html.Button('Get Data', id='get-data-button', n_clicks=0, className='button'),
+            html.Button('Get X Data', id='get-all-data-button', n_clicks=0, className='button'),
+            html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button'),
+            html.Button("Download CSV", id="btn_csv"),
+            html.Button("Config", id="config-button", n_clicks=0, className='button'),
+            dcc.Download(id="download-dataframe-csv"),
+        ], style=button_style),
+        
+        html.Div([
+            html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
+            dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
+            html.Label('Select the database to query:', style={'fontSize': '18px', 'marginRight': '10px', 'marginLeft': '15px'}),
+            dcc.Dropdown(id='database', options=config.get("database_options", []), value='postgres', style={'fontSize': '18px', 'width': '170px'}),
+        ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex','justifyContent': 'center'}),
+        html.Div(id='output-container', style=text_style2),
+        html.Div(id='output-container-all', style=text_style1),
+        dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0}),  # Store to keep track of click counts
+    ])
 
 
 page2_layout = html.Div([
@@ -122,7 +129,7 @@ page2_layout = html.Div([
     html.Button('Restart Dash Server', id='restart-system-button', n_clicks=0),
     html.Div(id='restart-confirmation', style={'marginTop': '20px'}),
     html.Div(id='save-confirmation', style={'marginTop': '20px'}),
-    html.A('Go back to main page', href='/')
+    html.A('Go back to main page', href='/dash/')
     
 ])
 
@@ -186,7 +193,7 @@ def display_page(pathname):
     if pathname == '/page2':
         return page2_layout
     else:
-        return main_page_layout
+        return main_page_layout()
 
 # Serves as the callback function for the Dash app to update the content of the output containers
 @app.callback(

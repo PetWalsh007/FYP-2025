@@ -2,23 +2,37 @@
     "databases": {
         "postgres": {
             "server": {
-                "ip": "192.168.1.81",
-                "port": 8000
+                "ip": "192.168.1.81"
             },
             "database": {
-                "name": "postgres",
                 "table": "plc_step_test"
             }
         },
-        "database_2": {
+        "sql_server": {
             "server": {
-                "ip": "XXXXXX",
-                "port": 0
+                "ip": "192.168.1.81"
             },
             "database": {
-                "name": "192dw",
-                "table": "Xxx"
+                "table": "testtable"
             }
         }
-    }
+    },
+    "database_options": [
+        {
+            "label": "Postgres",
+            "value": "postgres"
+        },
+        {
+            "label": "SQL Server",
+            "value": "sql_server"
+        },
+        {
+            "label": "MySQL",
+            "value": "mysql"
+        },
+        {
+            "label": "TEST",
+            "value": "test db"
+        }
+    ]
 }
