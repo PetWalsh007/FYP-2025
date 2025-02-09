@@ -7,6 +7,7 @@ and passed to respective database connections
 '''
 from connections import connectcls_sql_server, connectcls_postgres
 from fastapi import FastAPI
+import subprocess
 
 app = FastAPI()
 
@@ -50,6 +51,20 @@ def get_data(database: str ="null", table_name: str = "null", fil_condition: str
             return {"error": "No table name provided"}
     else:
         return {"error": "No database provided"}
+    
+
+
+@app.get("/command")
+def get_command(rst: str = "null"):
+    # receive commands and resart the server
+
+    # Code is to be updated to include a connection to server side db where rand_number is stored
+    if rst == 'restart_server_main_abstraction':
+        subprocess.Popen(["sudo", "systemctl", "restart", "gunicorn"])
+        
+        return {"message": "Server restarted"}
+    else:
+        return {"error": "No command provided"}
     
     
 # Function to query SQL Server database

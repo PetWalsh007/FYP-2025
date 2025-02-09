@@ -114,7 +114,7 @@ def main_page_layout():
 
 page2_layout = html.Div([
     html.H1("Edit Config File"),
-    #make red warning text
+    
     html.P("Warning: Editing the config file may cause the system to stop working. Only edit if you know what you are doing.", style={'color': 'red'}),
     
     dcc.Textarea(
@@ -124,17 +124,49 @@ page2_layout = html.Div([
     ),
     dcc.ConfirmDialog(
         id='confirm-danger',
-        message='This will restart the server for all users! If you continue, Please wait for confirmation message.',
+       message='This will restart the server for all users! If you continue, Please wait for confirmation message.',
+    ),
+    dcc.ConfirmDialog(
+        id='confirm-danger-dbs',
+       message='This will restart the database connections for all users! If you continue, Please wait for confirmation message.',
     ),
     html.Button('Save Config File to Server', id='save-config-button', n_clicks=0),
     html.Button('Restart Dash Server', id='restart-system-button', n_clicks=0),
+    html.Button('Restart DB Connections', id='restart-db-connections-button', n_clicks=0),
     html.Div(id='restart-confirmation', style={'marginTop': '20px'}),
+    html.Div(id='restart-dbs-confirmation', style={'marginTop': '20px'}),
     html.Div(id='save-confirmation', style={'marginTop': '20px'}),
     html.A('Go back to main page', href='/dash/')
     
 ])
 
 # https://dash.plotly.com/dash-core-components/confirmdialog for more information on the ConfirmDialog component
+
+# reordered to be in the correct order for the callbacks and functions
+
+@app.callback(
+    Output('confirm-danger-dbs', 'displayed'),
+    [Input('restart-db-connections-button', 'n_clicks')]
+)
+def restart_dbs_confirm(n_clicks):
+    if n_clicks > 0:
+        # Command to restart the database connections
+        return True
+       
+    return ''
+
+@app.callback(
+    Output('restart-dbs-confirmation', 'children'),
+    [Input('confirm-danger-dbs', 'submit_n_clicks')]
+)
+def restart_server_dbs(submit_n_clicks):
+    if submit_n_clicks:
+        endpoint_ip = config['endpoints']['abstraction']['ip']
+        endpoint_port = config['endpoints']['abstraction']['port']
+        response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/command?rst=restart_server_main_abstraction')
+        return response.text
+    return ''
+
 
 @app.callback(
     Output('confirm-danger', 'displayed'),
@@ -267,8 +299,11 @@ def get_data(n_clicks, db_sel):
 
     # use the config file to get the table name and database name
     database_table_sel = config['databases'][db_sel]['database']['table']
+    endpoint_ip = config['endpoints']['abstraction']['ip']
+    endpoint_port = config['endpoints']['abstraction']['port']
 
-    response = requests.get(f'http://192.168.1.81:8000/data?database={db_sel}&table_name={database_table_sel}&limit={n_clicks}') # updated to take the table name from the config file
+
+    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={database_table_sel}&limit={n_clicks}') # updated to take the table name from the config file
 
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]
@@ -279,8 +314,10 @@ def get_data_all(pts, db_sel):
     #using config file to get the table name
   
     database_table_sel = config['databases'][db_sel]['database']['table']
-
-    response = requests.get(f'http://192.168.1.81:8000/data?database={db_sel}&table_name={database_table_sel}&limit={pts}') # updated to take the table name from the config file
+    endpoint_ip = config['endpoints']['abstraction']['ip']
+    endpoint_port = config['endpoints']['abstraction']['port']
+    
+    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={database_table_sel}&limit={pts}') # updated to take the table name from the config file
 
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]
