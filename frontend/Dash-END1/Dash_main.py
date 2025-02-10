@@ -14,6 +14,8 @@ import pandas as pd
 import json
 import subprocess
 import time
+import random
+
 
 # Load the existing config
 CONFIG_FILE = "config.json"
@@ -32,11 +34,14 @@ def load_config_call():
     config = load_config()
      
 load_config_call()
-
+# routes pathname added for testing 
 app = dash.Dash(__name__,
-    requests_pathname_prefix='/dash/')
+    requests_pathname_prefix='/dash/',
+    routes_pathname_prefix='/dash/')
 app.title = 'RTA MES'
 server = app.server  # Expose the Flask server for Gunicorn
+
+
 
 dev_style = {
     'textAlign': 'center',
@@ -108,7 +113,7 @@ def main_page_layout():
         ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex','justifyContent': 'center'}),
         html.Div(id='output-container', style=text_style2),
         html.Div(id='output-container-all', style=text_style1),
-        dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0}),  # Store to keep track of click counts
+        dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
     ])
 
 
@@ -142,7 +147,7 @@ page2_layout = html.Div([
 
 # https://dash.plotly.com/dash-core-components/confirmdialog for more information on the ConfirmDialog component
 
-# reordered to be in the correct order for the callbacks and functions
+
 
 @app.callback(
     Output('confirm-danger-dbs', 'displayed'),
@@ -164,6 +169,7 @@ def restart_server_dbs(submit_n_clicks):
         endpoint_ip = config['endpoints']['abstraction']['ip']
         endpoint_port = config['endpoints']['abstraction']['port']
         response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/command?rst=restart_server_main_abstraction')
+        time.sleep(2) # for a wait time to allow the server to restart
         return response.text
     return ''
 
@@ -230,11 +236,13 @@ def display_page(pathname):
         return main_page_layout()
 
 # Serves as the callback function for the Dash app to update the content of the output containers
+
 @app.callback(
     [Output('output-container', 'children'),
      Output('output-container-all', 'children'),
      Output('store', 'data'),
-     Output('url', 'pathname')],
+     Output('url', 'pathname'),
+     Output('download-dataframe-csv', 'data')],
     [Input('clear-screen-button', 'n_clicks'),
      Input('get-data-button', 'n_clicks'),
      Input('get-all-data-button', 'n_clicks'),
@@ -250,35 +258,44 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
     ctx = dash.callback_context
 
     if not ctx.triggered:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
+    
+    # https://dash.plotly.com/dash-core-components/download
+    # Generate CSV data from the current data on the screen
     if button_id == 'btn_csv':
-        # Generate CSV data
-        data = get_data(store_data['get_data_clicks'], db_sel)  # Define data here
+        
+        filename1 = f"data_{time.strftime('%H%M%S')}_{random.randint(1,50)}.csv"
+        data = store_data.get('onscreen_data', [{'col1': 'value1', 'col2': 'value2'}, {'col1': 'value3', 'col2': 'value4'}])
         csv_data = generate_csv_data(data)
-        return dash.no_update, dash.no_update, store_data, dcc.send_data_frame(csv_data.to_csv, "data.csv")
+        return dash.no_update, dash.no_update, store_data, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False)
 
     if button_id == 'clear-screen-button':
         store_data['get_data_clicks'] = 0
         store_data['get_all_data_clicks'] = 0
-        return clear_screen(), clear_screen(), store_data, dash.no_update  # Clear the content of both output containers and reset click counts
+        
+        return clear_screen(), clear_screen(), store_data, dash.no_update, dash.no_update  # Clear the content of both output containers and reset click counts
 
     if button_id == 'get-data-button' and get_data_clicks > 0:
+        
         store_data['get_data_clicks'] += 1  
         data = get_data(store_data['get_data_clicks'], db_sel)  
-        return html.Div(['Button clicked ', html.B(store_data["get_data_clicks"]), f' times. Data: {data}']), clear_screen(), store_data, dash.no_update
+        store_data['onscreen_data'] = data  # update the store for onscreen data
+        return html.Div(['Button clicked ', html.B(store_data["get_data_clicks"]), f' times. Data: {data}']), clear_screen(), store_data, dash.no_update, dash.no_update
 
     if button_id == 'get-all-data-button' and get_all_data_clicks > 0:
+        store_data['onscreen_data'] = []  # Reset the onscreen data
         all_data = get_data_all(data_pt, db_sel)
         store_data['get_data_clicks'] = 0  # Reset the click count for the other button
-        return clear_screen(), f'Button clicked. All Data: {all_data}', store_data, dash.no_update
+        
+        store_data['onscreen_data'] = all_data # update the store for onscreen data
+        return clear_screen(), f'Button clicked. All Data: {all_data}', store_data, dash.no_update, dash.no_update
 
     if button_id == 'config-button':
-        return dash.no_update, dash.no_update, store_data, '/page2'
+        return dash.no_update, dash.no_update, store_data, '/page2', dash.no_update
 
-    return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
    
 
 
