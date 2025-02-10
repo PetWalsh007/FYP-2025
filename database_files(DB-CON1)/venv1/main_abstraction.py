@@ -10,6 +10,7 @@ from fastapi import FastAPI
 import subprocess
 import logging
 from contextlib import asynccontextmanager
+import time
 
 logging.basicConfig(filename="fastapi_lifespan.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -76,7 +77,9 @@ async def get_command(rst: str = "null"):
 
     # Code is to be updated to include a connection to server side db where rand_number is stored
     if rst == 'restart_server_main_abstraction':
-        subprocess.Popen(["sudo", "systemctl", "restart", "gunicorn"])
+        subprocess.Popen(["sudo", "systemctl", "stop", "gunicorn"])
+        time.sleep(3)
+        subprocess.Popen(["sudo", "systemctl", "start", "gunicorn"])
         
         return {"message": "Server restarted"}
     else:
