@@ -95,6 +95,9 @@ class connectcls_postgres:
         self.connection_password = connection_password
         self.port = port
 
+
+        self.conn, self.cursor, self.con_err = self.make_connection()
+
     def __str__(self):
         return f'Connection ID: {self.connection_id}, User ID: {self.user_id}, Connection Name: {self.connection_name}, Connection Type: {self.connection_type}, Connection URL: {self.connection_url}, Connection Port: {self.connection_port}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
 
@@ -121,13 +124,12 @@ class connectcls_postgres:
             return None, None, [{"error": f"General error - {str(e)}"}]
 
 
-    def query(self, cursor, query):
-        try:
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            result = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
-
-            return result
+    def query(self, query):
+        try: 
+            
+            self.cursor.execute(query)
+            rows = self.cursor.fetchall()
+            return [dict(zip([column[0] for column in self.cursor.description], row)) for row in rows]
         except pyodbc.ProgrammingError as e:
             print(f"Query failed: {e}")
             return [{"error": "Query failure - Check SQL syntax"}]

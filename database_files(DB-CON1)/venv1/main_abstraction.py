@@ -19,15 +19,24 @@ sqls_con = None
 def startup():
     #Runs at FastAPI startup
     global sqls_con
+    global postgres_con
     sqls_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
-    sqls_con.make_connection()
+    postgres_con = connectcls_postgres(
+        driver_name="PostgreSQL Unicode",
+        server_name="192.168.1.55",
+        db_name="Test_DB",
+        connection_username="test_user",
+        connection_password="test_user"
+    )
 
 @app.on_event("shutdown")
 def shutdown():
     # Closing connection when the worker shuts down
-    global sqls_con
+    
     if sqls_con:
         sqls_con.close_connection()
+    if postgres_con:
+        postgres_con.close_connection()
 
 
 
@@ -90,31 +99,19 @@ def sql_server(query):
 # Function to query PostgreSQL database
 def postgres(query):
 
-    # Test PostgreSQL connection
-    test_conn_postgres = connectcls_postgres(
-        driver_name="PostgreSQL Unicode",
-        server_name="192.168.1.55",
-        db_name="Test_DB",
-        connection_username="test_user",
-        connection_password="test_user"
-    )
+    
+    if postgres_con.conn is None:
+        if postgres_con.con_err:
+            return postgres_con.con_err
+        else:
+            return {"error": "Postgres connection not established"}
+    
 
-    # Make connection and get cursor object
-    conn, cursor, errors = test_conn_postgres.make_connection()
-
-    if conn and not errors:
+    if postgres_con:
         # Execute query
-        result = test_conn_postgres.query(cursor, query)
-        if result:
-            print(result)
-    if errors:
-        # Print errors if any
-        print(errors)
-        return errors
-        
-    # Close connection
-    if conn:
-        test_conn_postgres.close_connection(conn)
+            
+        result = postgres_con.query(query)  
+
 
     return result
 
