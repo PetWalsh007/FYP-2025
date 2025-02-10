@@ -20,7 +20,9 @@ def startup():
     #Runs at FastAPI startup
     global sqls_con
     global postgres_con
+    
     sqls_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
+
     postgres_con = connectcls_postgres(
         driver_name="PostgreSQL Unicode",
         server_name="192.168.1.55",

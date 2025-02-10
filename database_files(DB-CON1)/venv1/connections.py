@@ -142,6 +142,6 @@ class connectcls_postgres:
 
 
     
-    def close_connection(self, conn):
-        conn.close()
+    def close_connection(self):
+        self.conn.close()
         print("Connection closed")
