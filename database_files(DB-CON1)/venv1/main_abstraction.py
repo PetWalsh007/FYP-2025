@@ -8,21 +8,21 @@ and passed to respective database connections
 from connections import connectcls_sql_server, connectcls_postgres
 from fastapi import FastAPI
 import subprocess
+import logging
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+logging.basicConfig(filename="fastapi_lifespan.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
+# Updated from FASTAPI docs to use async context manager https://fastapi.tiangolo.com/advanced/events/#lifespan
 
-sqls_con = None
-
-
-@app.on_event("startup")
-def startup():
-    #Runs at FastAPI startup
-    global sqls_con
-    global postgres_con
-    
+@asynccontextmanager
+async def lifespan(app):
+    # Runs at FastAPI startup
+    global sqls_con 
+    global postgres_con 
+    logging.info("Starting FastAPI lifespan function...")
     sqls_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
-
+    
     postgres_con = connectcls_postgres(
         driver_name="PostgreSQL Unicode",
         server_name="192.168.1.55",
@@ -31,24 +31,29 @@ def startup():
         connection_password="test_user"
     )
 
-@app.on_event("shutdown")
-def shutdown():
+    logging.info("Database connections initialized.")
+    logging.info(f'SQL Server connection: {sqls_con.conn}, PostgreSQL connection: {postgres_con.conn}')
+
+    yield
+
     # Closing connection when the worker shuts down
-    
     if sqls_con:
         sqls_con.close_connection()
     if postgres_con:
         postgres_con.close_connection()
 
+    logging.info("Database connections closed.")
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/data")
-def get_data(database: str ="null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10):
+async def get_data(database: str ="null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10):
     # Check if the database is SQL Server
     if database == 'sql_server':
         if table_name:
             query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
-            result = sql_server(query)
+            result = await sql_server(query)
             return result
         else:
             return {"error": "No table name provided"}
@@ -56,7 +61,7 @@ def get_data(database: str ="null", table_name: str = "null", fil_condition: str
     elif database == 'postgres':
         if table_name:
             query = f"SELECT * from {table_name} LIMIT {limit}"
-            result = postgres(query)
+            result = await postgres(query)
             return result
         else:
             return {"error": "No table name provided"}
@@ -66,7 +71,7 @@ def get_data(database: str ="null", table_name: str = "null", fil_condition: str
 
 
 @app.get("/command")
-def get_command(rst: str = "null"):
+async def get_command(rst: str = "null"):
     # receive commands and resart the server
 
     # Code is to be updated to include a connection to server side db where rand_number is stored
@@ -79,7 +84,7 @@ def get_command(rst: str = "null"):
     
     
 # Function to query SQL Server database
-def sql_server(query):
+async def sql_server(query):
     # Test SQL Server connection
     # we want to use the connection object created globally 
     
@@ -99,7 +104,7 @@ def sql_server(query):
     return result
 
 # Function to query PostgreSQL database
-def postgres(query):
+async def postgres(query):
 
     
     if postgres_con.conn is None:
