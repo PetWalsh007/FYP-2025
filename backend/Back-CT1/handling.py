@@ -39,3 +39,11 @@ def get_data_request(database: str ="null", table_name: str = "null", fil_condit
     pass
 
 
+@app.post("/send_req")
+def send_data_request(config: dict):
+    # function to send data to appropriate LxCT
+    # config will be a dictionary with paramters to pass to the abstraction layer
+
+
+    pass
+
