@@ -35,9 +35,7 @@ def load_config_call():
      
 load_config_call()
 # routes pathname added for testing 
-app = dash.Dash(__name__,
-    requests_pathname_prefix='/dash/',
-    routes_pathname_prefix='/dash/')
+app = dash.Dash(__name__, requests_pathname_prefix='/dash/')
 app.title = 'RTA MES'
 server = app.server  # Expose the Flask server for Gunicorn
 
@@ -81,7 +79,8 @@ text_style2 = {
 # Define the layout of the Dash app 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    html.Div(id='page-content')
+    html.Div(id='page-content'),
+    html.A(html.Button("Go to Home Page"), href="/", target="_self") #_self used to trigger full page reload 
 ], style={'fontFamily': 'Times New Roman', 'padding': '40px'})
 
 
@@ -220,7 +219,7 @@ def save_config_file(n_clicks, config_text):
     [Input('url', 'pathname')]
 )
 def update_config_textarea(pathname):
-    if pathname == '/page2':
+    if pathname == '/dash/page2':  
         return json.dumps(load_config(), indent=4)
     return dash.no_update
 
@@ -230,10 +229,9 @@ def update_config_textarea(pathname):
     [Input('url', 'pathname')]
 )
 def display_page(pathname):
-    if pathname == '/page2':
+    if pathname == '/dash/page2':
         return page2_layout
-    else:
-        return main_page_layout()
+    return main_page_layout()
 
 # Serves as the callback function for the Dash app to update the content of the output containers
 
@@ -293,7 +291,7 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
         return clear_screen(), f'Button clicked. All Data: {all_data}', store_data, dash.no_update, dash.no_update
 
     if button_id == 'config-button':
-        return dash.no_update, dash.no_update, store_data, '/page2', dash.no_update
+        return dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update
 
     return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
    
