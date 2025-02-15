@@ -33,7 +33,10 @@ async def lifespan(app):
     )
 
     logging.info("Database connections initialized.")
-    logging.info(f'SQL Server connection: {sqls_con.conn}, PostgreSQL connection: {postgres_con.conn}')
+    logging.info("***********************************")
+    logging.info(f"SQL Server connection established: {sqls_con.conn is not None}")
+    logging.info(f"PostgreSQL connection established: {postgres_con.conn is not None}")
+    logging.info("***********************************")
 
     yield
 
@@ -54,6 +57,7 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
     if database == 'sql_server':
         if table_name:
             query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
+            logging.info(f"Executing SQL Server query: {query}")
             result = await sql_server(query)
             return result
         else:
@@ -62,6 +66,7 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
     elif database == 'postgres':
         if table_name:
             query = f"SELECT * from {table_name} LIMIT {limit}"
+            logging.info(f"Executing PostgreSQL query: {query}")
             result = await postgres(query)
             return result
         else:
@@ -77,11 +82,9 @@ async def get_command(rst: str = "null"):
 
     # Code is to be updated to include a connection to server side db where rand_number is stored
     if rst == 'restart_server_main_abstraction':
-        subprocess.Popen(["sudo", "systemctl", "stop", "gunicorn"])
-        time.sleep(3)
-        subprocess.Popen(["sudo", "systemctl", "start", "gunicorn"])
+        subprocess.Popen(["sudo", "killall", "gunicorn"])
         
-        return {"message": "Server restarted"}
+        return {"message": "Server shutdown initiated, Server will automatically restart."}
     else:
         return {"error": "No command provided"}
     
@@ -90,7 +93,7 @@ async def get_command(rst: str = "null"):
 async def sql_server(query):
     # Test SQL Server connection
     # we want to use the connection object created globally 
-    
+    logging.info(f"Received request for /command")
     if sqls_con.conn is None:
         if sqls_con.con_err:
             return sqls_con.con_err
