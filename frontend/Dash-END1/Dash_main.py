@@ -110,13 +110,26 @@ def main_page_layout():
             dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
             html.Label('Select the database to query:', style={'fontSize': '18px', 'marginRight': '10px', 'marginLeft': '15px'}),
             dcc.Dropdown(id='database', options=config.get("database_options", []), value='postgres', style={'fontSize': '18px', 'width': '170px'}),
+            dcc.Dropdown(
+                        id="table_name",
+                        options= [
+                                    {"label": f"{db_name.upper()} - {table}", "value": table}
+                                    for db_name, db_info in config["databases"].items()
+                                    for table in db_info["database"].get("tables", [])
+                                ],  # Dynamically loads all tables
+                        value=None,
+                        placeholder="Select a Table",
+                        style={'fontSize': '18px', 'width': '250px'}
+    ),
         ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex','justifyContent': 'center'}),
         html.Div(id='output-container', style=text_style2),
         html.Div([dash_table.DataTable(
                                         id="data-table",
                                         columns=[],  # Columns 
                                         data=[],  # defualt empty data
-                                        page_size=1000   
+                                        filter_action="native",
+                                        sort_action="native",
+                                        page_size=1500   
                                         )
                 ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
@@ -254,13 +267,14 @@ def display_page(pathname):
      Input('get-all-data-button', 'n_clicks'),
      Input('data-points', 'value'),
      Input('database', 'value'),
+     Input('table_name', 'value'),
      Input("btn_csv", "n_clicks"),
      Input("config-button", "n_clicks"),
      Input('url', 'pathname')],
     [State('store', 'data')],
     prevent_initial_call=True
 )
-def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_sel, download_cts, config_button, pathname, store_data):
+def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_sel, tbl_sel ,download_cts, config_button, pathname, store_data):
     ctx = dash.callback_context
 
     if not ctx.triggered:
@@ -287,7 +301,7 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
 
     if button_id == 'get-data-button' and get_data_clicks > 0:
         store_data['get_data_clicks'] += 1  
-        data = get_data(store_data['get_data_clicks'], db_sel)  
+        data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  # Get data from the database  
         store_data['onscreen_data'] = data  # update onscreen data
         df = pd.DataFrame(data)
 
@@ -303,7 +317,7 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
     
     if button_id == 'get-all-data-button' and get_all_data_clicks > 0:
         store_data['onscreen_data'] = []  # Reset the onscreen data
-        all_data = get_data_all(data_pt, db_sel)
+        all_data = get_data_all(data_pt, db_sel, tbl_sel)  # Get all data from the database
         store_data['get_data_clicks'] = 0  # Reset click count
 
         df = pd.DataFrame(all_data)
@@ -338,30 +352,30 @@ def generate_csv_data(data_to_download):
 
    
 
-def get_data(n_clicks, db_sel):
+def get_data(n_clicks, db_sel, tbl_sel):
     # This function will send a request to the FastAPI server to get data from the database
 
     # use the config file to get the table name and database name
-    database_table_sel = config['databases'][db_sel]['database']['table']
+    #database_table_sel = config['databases'][db_sel]['database']['table']
     endpoint_ip = config['endpoints']['abstraction']['ip']
     endpoint_port = config['endpoints']['abstraction']['port']
 
 
-    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={database_table_sel}&limit={n_clicks}') # updated to take the table name from the config file
+    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={n_clicks}') # updated to take the table name from the dropdown
 
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]
     return response.json()
 
-def get_data_all(pts, db_sel):
+def get_data_all(pts, db_sel, tbl_sel):
 
     #using config file to get the table name
   
-    database_table_sel = config['databases'][db_sel]['database']['table']
+    #database_table_sel = config['databases'][db_sel]['database']['table']
     endpoint_ip = config['endpoints']['abstraction']['ip']
     endpoint_port = config['endpoints']['abstraction']['port']
     
-    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={database_table_sel}&limit={pts}') # updated to take the table name from the config file
+    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}') # updated to take the table name from the dropdown
 
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]

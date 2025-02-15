@@ -5,7 +5,10 @@
                 "ip": "192.168.1.81"
             },
             "database": {
-                "table": "plc_step_test"
+                "tables": [
+                    "plc_step_test",
+                    "TEST"
+                ]
             }
         },
         "sql_server": {
@@ -13,7 +16,10 @@
                 "ip": "192.168.1.81"
             },
             "database": {
-                "table": "testtable"
+                "tables": [
+                    "HistoricalData",
+                    "testtable"
+                ]
             }
         }
     },
@@ -34,5 +40,11 @@
             "label": "TEST",
             "value": "test db"
         }
-    ]
+    ],
+    "endpoints": {
+        "abstraction": {
+            "ip": "192.168.1.81",
+            "port": "8000"
+        }
+    }
 }
