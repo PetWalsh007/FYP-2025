@@ -6,7 +6,7 @@ https://dash.plotly.com/ for more information on Dash and how the Dash framework
 '''
 
 import dash
-from dash import dcc 
+from dash import dcc, dash_table
 from dash import html
 from dash.dependencies import Input, Output, State
 import requests
@@ -89,6 +89,7 @@ app.layout = html.Div([
 # Define the layout for the main page
 # https://dash.plotly.com/dash-html-components for more information on the HTML components
 # https://dash.plotly.com/dash-core-components for more information on the DCC's
+# https://dash.plotly.com/datatable for more information on the DataTable component used 
 
 # Updated 08/02 to a function to allow for easier testing of dynamic content in dropdown from JSON config
 def main_page_layout():
@@ -111,7 +112,13 @@ def main_page_layout():
             dcc.Dropdown(id='database', options=config.get("database_options", []), value='postgres', style={'fontSize': '18px', 'width': '170px'}),
         ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex','justifyContent': 'center'}),
         html.Div(id='output-container', style=text_style2),
-        html.Div(id='output-container-all', style=text_style1),
+        html.Div([dash_table.DataTable(
+                                        id="data-table",
+                                        columns=[],  # Columns 
+                                        data=[],  # defualt empty data
+                                        page_size=1000   
+                                        )
+                ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
     ])
 
@@ -237,7 +244,8 @@ def display_page(pathname):
 
 @app.callback(
     [Output('output-container', 'children'),
-     Output('output-container-all', 'children'),
+     Output('data-table', 'columns'),  
+     Output('data-table', 'data'),  
      Output('store', 'data'),
      Output('url', 'pathname'),
      Output('download-dataframe-csv', 'data')],
@@ -256,7 +264,9 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
     ctx = dash.callback_context
 
     if not ctx.triggered:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, 
+    dash.no_update, dash.no_update,
+    dash.no_update, dash.no_update
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
@@ -267,33 +277,52 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
         filename1 = f"data_{time.strftime('%H%M%S')}_{random.randint(1,50)}.csv"
         data = store_data.get('onscreen_data', [{'col1': 'value1', 'col2': 'value2'}, {'col1': 'value3', 'col2': 'value4'}])
         csv_data = generate_csv_data(data)
-        return dash.no_update, dash.no_update, store_data, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False)
+        return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False)
 
     if button_id == 'clear-screen-button':
         store_data['get_data_clicks'] = 0
         store_data['get_all_data_clicks'] = 0
         
-        return clear_screen(), clear_screen(), store_data, dash.no_update, dash.no_update  # Clear the content of both output containers and reset click counts
+        return clear_screen(), [], [], store_data, dash.no_update, dash.no_update  # Clear the content of both output containers and reset click counts
 
     if button_id == 'get-data-button' and get_data_clicks > 0:
-        
         store_data['get_data_clicks'] += 1  
         data = get_data(store_data['get_data_clicks'], db_sel)  
-        store_data['onscreen_data'] = data  # update the store for onscreen data
-        return html.Div(['Button clicked ', html.B(store_data["get_data_clicks"]), f' times. Data: {data}']), clear_screen(), store_data, dash.no_update, dash.no_update
+        store_data['onscreen_data'] = data  # update onscreen data
+        df = pd.DataFrame(data)
 
+        return (
+            html.Div(['Button clicked ', html.B(store_data["get_data_clicks"]), ' times.']),
+            [{"name": i, "id": i} for i in df.columns],  
+            store_data["onscreen_data"],  
+            store_data, 
+            dash.no_update, 
+            dash.no_update
+        )
+
+    
     if button_id == 'get-all-data-button' and get_all_data_clicks > 0:
         store_data['onscreen_data'] = []  # Reset the onscreen data
         all_data = get_data_all(data_pt, db_sel)
-        store_data['get_data_clicks'] = 0  # Reset the click count for the other button
-        
-        store_data['onscreen_data'] = all_data # update the store for onscreen data
-        return clear_screen(), f'Button clicked. All Data: {all_data}', store_data, dash.no_update, dash.no_update
+        store_data['get_data_clicks'] = 0  # Reset click count
+
+        df = pd.DataFrame(all_data)
+        store_data['onscreen_data'] = df.to_dict('records') 
+
+        return (
+            clear_screen(),
+            [{"name": i, "id": i} for i in df.columns],  
+            store_data["onscreen_data"],  
+            store_data, 
+            dash.no_update, 
+            dash.no_update
+        )
+
 
     if button_id == 'config-button':
-        return dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update
 
-    return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
    
 
 

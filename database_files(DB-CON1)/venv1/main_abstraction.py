@@ -11,6 +11,10 @@ import subprocess
 import logging
 from contextlib import asynccontextmanager
 import time
+import asyncio
+
+
+
 
 logging.basicConfig(filename="fastapi_lifespan.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -99,13 +103,7 @@ async def sql_server(query):
             return sqls_con.con_err
         else:
             return {"error": "SQL Server connection not established"}
-    
-
-    if sqls_con:
-        # Execute query
-            
-        result = sqls_con.query(query)  
-
+    result = await asyncio.to_thread(sqls_con.query, query)
 
     return result
 
@@ -119,11 +117,7 @@ async def postgres(query):
         else:
             return {"error": "Postgres connection not established"}
     
-
-    if postgres_con:
-        # Execute query
-            
-        result = postgres_con.query(query)  
+    result = await asyncio.to_thread(postgres_con.query, query)
 
 
     return result
