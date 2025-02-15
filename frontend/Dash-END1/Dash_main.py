@@ -15,10 +15,13 @@ import json
 import subprocess
 import time
 import random
+import plotly.express as px
 
 
 # Load the existing config
 CONFIG_FILE = "config.json"
+# global dataframe for data to plot 
+dataframe = pd.DataFrame()
 
 def load_config():
     with open(CONFIG_FILE, "r") as file:
@@ -123,6 +126,14 @@ def main_page_layout():
     ),
         ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex','justifyContent': 'center'}),
         html.Div(id='output-container', style=text_style2),
+
+        html.Div([
+            dcc.Dropdown(id="x-axis-dropdown", placeholder="Select X-Axis", style={'width': '250px'}),
+            dcc.Dropdown(id="y-axis-dropdown", multi=True, placeholder="Select Y-Axis", style={'width': '350px'}),
+        ], style={'display': 'flex', 'gap': '10px', 'margin': '20px'}),
+
+        dcc.Graph(id="data-plot"),  
+
         html.Div([dash_table.DataTable(
                                         id="data-table",
                                         columns=[],  # Columns 
@@ -259,9 +270,11 @@ def display_page(pathname):
     [Output('output-container', 'children'),
      Output('data-table', 'columns'),  
      Output('data-table', 'data'),  
-     Output('store', 'data'),
+     Output('store', 'data'),  # Store data for visualization
      Output('url', 'pathname'),
-     Output('download-dataframe-csv', 'data')],
+     Output('download-dataframe-csv', 'data'),
+     Output('x-axis-dropdown', 'options'),  # Populate X-axis dropdown
+     Output('y-axis-dropdown', 'options')],  # Populate Y-axis dropdown (numeric)
     [Input('clear-screen-button', 'n_clicks'),
      Input('get-data-button', 'n_clicks'),
      Input('get-all-data-button', 'n_clicks'),
@@ -301,44 +314,59 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
 
     if button_id == 'get-data-button' and get_data_clicks > 0:
         store_data['get_data_clicks'] += 1  
-        data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  # Get data from the database  
-        store_data['onscreen_data'] = data  # update onscreen data
-        df = pd.DataFrame(data)
+        global dataframe
+        data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  
+        store_data['onscreen_data'] = data
+        dataframe = pd.DataFrame(data)
 
-        return (
-            html.Div(['Button clicked ', html.B(store_data["get_data_clicks"]), ' times.']),
-            [{"name": i, "id": i} for i in df.columns],  
-            store_data["onscreen_data"],  
-            store_data, 
-            dash.no_update, 
-            dash.no_update
-        )
+    elif button_id == 'get-all-data-button' and get_all_data_clicks > 0:
+        store_data['onscreen_data'] = []
+        all_data = get_data_all(data_pt, db_sel, tbl_sel)  
+        store_data['get_data_clicks'] = 0  
+        dataframe = pd.DataFrame(all_data)
+        store_data['onscreen_data'] = dataframe.to_dict('records')
 
-    
-    if button_id == 'get-all-data-button' and get_all_data_clicks > 0:
-        store_data['onscreen_data'] = []  # Reset the onscreen data
-        all_data = get_data_all(data_pt, db_sel, tbl_sel)  # Get all data from the database
-        store_data['get_data_clicks'] = 0  # Reset click count
+    else:
+        return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
-        df = pd.DataFrame(all_data)
-        store_data['onscreen_data'] = df.to_dict('records') 
-
-        return (
-            clear_screen(),
-            [{"name": i, "id": i} for i in df.columns],  
-            store_data["onscreen_data"],  
-            store_data, 
-            dash.no_update, 
-            dash.no_update
-        )
-
+    column_options = [{"label": col, "value": col} for col in dataframe.columns]
+    numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
 
     if button_id == 'config-button':
         return dash.no_update, dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update
 
-    return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    return (
+        html.Div([f"Data retrieved for {tbl_sel} in {db_sel}."]),
+        [{"name": i, "id": i} for i in dataframe.columns],  # Table Columns
+        store_data["onscreen_data"],  # Table Data
+        store_data,  # Store Data for visualization
+        dash.no_update,
+        dash.no_update,
+        column_options,  # Populate X-axis dropdown
+        numeric_columns  # Populate Y-axis dropdown (only numeric columns)
+    )
    
 
+@app.callback(
+    Output("data-plot", "figure"),
+    [Input("x-axis-dropdown", "value"),
+     Input("y-axis-dropdown", "value")],
+    State("store", "data"),
+    prevent_initial_call=True
+    
+)
+def update_graph(x_axis, y_axes, store_data):
+    """Plots selected data from stored dataset."""
+    if not store_data or "onscreen_data" not in store_data or not store_data["onscreen_data"]:
+        return px.scatter(title="No Data Available. Fetch Data First.")
+
+    df = pd.DataFrame(store_data["onscreen_data"])
+
+    if not x_axis or not y_axes:
+        return px.scatter(title="Select X and Y axes to display visualization.")
+
+    fig = px.line(df, x=x_axis, y=y_axes, markers=True, title="Dynamic Data Plot")
+    return fig
 
 
 
@@ -354,7 +382,7 @@ def generate_csv_data(data_to_download):
 
 def get_data(n_clicks, db_sel, tbl_sel):
     # This function will send a request to the FastAPI server to get data from the database
-
+   
     # use the config file to get the table name and database name
     #database_table_sel = config['databases'][db_sel]['database']['table']
     endpoint_ip = config['endpoints']['abstraction']['ip']
@@ -362,13 +390,13 @@ def get_data(n_clicks, db_sel, tbl_sel):
 
 
     response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={n_clicks}') # updated to take the table name from the dropdown
-
+   
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]
     return response.json()
 
 def get_data_all(pts, db_sel, tbl_sel):
-
+    
     #using config file to get the table name
   
     #database_table_sel = config['databases'][db_sel]['database']['table']
