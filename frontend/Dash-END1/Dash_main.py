@@ -81,9 +81,10 @@ text_style2 = {
 
 # Define the layout of the Dash app 
 app.layout = html.Div([
+    html.A(html.Button("Go to Home Page"), href="/", target="_self"), #_self used to trigger full page reload 
     dcc.Location(id='url', refresh=False),
-    html.Div(id='page-content'),
-    html.A(html.Button("Go to Home Page"), href="/", target="_self") #_self used to trigger full page reload 
+    html.Div(id='page-content')
+   
 ], style={'fontFamily': 'Times New Roman', 'padding': '40px'})
 
 
@@ -93,6 +94,8 @@ app.layout = html.Div([
 # https://dash.plotly.com/dash-html-components for more information on the HTML components
 # https://dash.plotly.com/dash-core-components for more information on the DCC's
 # https://dash.plotly.com/datatable for more information on the DataTable component used 
+# https://dash.plotly.com/dash-core-components/graph for more information on the Graph component used
+# https://plotly.com/ For more information on Plotty - Used for graphing
 
 # Updated 08/02 to a function to allow for easier testing of dynamic content in dropdown from JSON config
 def main_page_layout():
@@ -130,6 +133,11 @@ def main_page_layout():
         html.Div([
             dcc.Dropdown(id="x-axis-dropdown", placeholder="Select X-Axis", style={'width': '250px'}),
             dcc.Dropdown(id="y-axis-dropdown", multi=True, placeholder="Select Y-Axis", style={'width': '350px'}),
+            dcc.Dropdown(id='Graph-type', options=[{'label': 'Scatter', 'value': 'scatter'}, {'label': 'Line', 'value': 'line'},
+                                                   {'label': 'Bar', 'value': 'bar'}, {'label': 'Box', 'value': 'box'},
+                                                    {'label': 'Histogram', 'value': 'histogram'},
+                                                    {'label': 'Pie', 'value': 'pie'},
+                                                   ], value='scatter', style={'width': '150px'}),
         ], style={'display': 'flex', 'gap': '10px', 'margin': '20px'}),
 
         dcc.Graph(id="data-plot"),  
@@ -171,7 +179,7 @@ page2_layout = html.Div([
     html.Div(id='restart-confirmation', style={'marginTop': '20px'}),
     html.Div(id='restart-dbs-confirmation', style={'marginTop': '20px'}),
     html.Div(id='save-confirmation', style={'marginTop': '20px'}),
-    html.A('Go back to main page', href='/dash/')
+    html.A('Go back to main page Dash', href='/dash/')
     
 ])
 
@@ -291,9 +299,7 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
     ctx = dash.callback_context
 
     if not ctx.triggered:
-        return dash.no_update, dash.no_update, 
-    dash.no_update, dash.no_update,
-    dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
@@ -304,13 +310,13 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
         filename1 = f"data_{time.strftime('%H%M%S')}_{random.randint(1,50)}.csv"
         data = store_data.get('onscreen_data', [{'col1': 'value1', 'col2': 'value2'}, {'col1': 'value3', 'col2': 'value4'}])
         csv_data = generate_csv_data(data)
-        return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False)
+        return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False), dash.no_update, dash.no_update
 
     if button_id == 'clear-screen-button':
         store_data['get_data_clicks'] = 0
         store_data['get_all_data_clicks'] = 0
         
-        return clear_screen(), [], [], store_data, dash.no_update, dash.no_update  # Clear the content of both output containers and reset click counts
+        return clear_screen(), [], [], store_data, dash.no_update, dash.no_update, [], []  # Clear the content of both output containers, reset click counts, and reset dropdowns
 
     if button_id == 'get-data-button' and get_data_clicks > 0:
         store_data['get_data_clicks'] += 1  
@@ -326,14 +332,14 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
         dataframe = pd.DataFrame(all_data)
         store_data['onscreen_data'] = dataframe.to_dict('records')
 
+    elif button_id == 'config-button':
+        return dash.no_update, dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update, dash.no_update, dash.no_update 
+
     else:
         return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     column_options = [{"label": col, "value": col} for col in dataframe.columns]
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
-
-    if button_id == 'config-button':
-        return dash.no_update, dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update
 
     return (
         html.Div([f"Data retrieved for {tbl_sel} in {db_sel}."]),
@@ -351,21 +357,38 @@ def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_s
     Output("data-plot", "figure"),
     [Input("x-axis-dropdown", "value"),
      Input("y-axis-dropdown", "value")],
+     Input("Graph-type", "value"),
     State("store", "data"),
     prevent_initial_call=True
     
 )
-def update_graph(x_axis, y_axes, store_data):
+def update_graph(x_axis, y_axes, g_type ,store_data):
     """Plots selected data from stored dataset."""
     if not store_data or "onscreen_data" not in store_data or not store_data["onscreen_data"]:
         return px.scatter(title="No Data Available. Fetch Data First.")
 
     df = pd.DataFrame(store_data["onscreen_data"])
 
+
     if not x_axis or not y_axes:
         return px.scatter(title="Select X and Y axes to display visualization.")
+    
+    if g_type == 'scatter':
+        fig = px.scatter(df, x=x_axis, y=y_axes, title="Data Plot")
+    elif g_type == 'line':
 
-    fig = px.line(df, x=x_axis, y=y_axes, markers=True, title="Dynamic Data Plot")
+        fig = px.line(df, x=x_axis, y=y_axes, markers=True, title="Data Plot")
+    elif g_type == 'bar':
+        fig = px.bar(df, x=x_axis, y=y_axes, title="Data Plot")
+    elif g_type == 'box':
+        fig = px.box(df, x=x_axis, y=y_axes, title="Data Plot")
+    elif g_type == 'histogram':
+        fig = px.histogram(df, x=x_axis, y=y_axes, title="Data Plot")
+    elif g_type == 'pie':
+        fig = px.pie(df, names=x_axis, values=y_axes[0], title="Data Plot")
+    else:
+        fig = px.scatter(df, x=x_axis, y=y_axes, title="Data Plot")
+
     return fig
 
 
