@@ -16,7 +16,7 @@ import subprocess
 import time
 import random
 import plotly.express as px
-
+from datetime import date
 
 # Load the existing config
 CONFIG_FILE = "config.json"
@@ -98,11 +98,17 @@ app.layout = html.Div([
 # https://plotly.com/ For more information on Plotty - Used for graphing
 
 # Updated 08/02 to a function to allow for easier testing of dynamic content in dropdown from JSON config
+# Updated 16/02 to add date picker range dcc and also update to begin in browser storage of multiple dataframe ahead of backend work
 def main_page_layout():
     return html.Div([
         html.Div(className='row', children='Real-Time Adaptive Data Analytics and Visualisation Platform for Industrial Manufacturing Execution Systems',
                 style=dev_style),
         html.Div([
+            dcc.DatePickerRange(
+                                id='data-date-range',
+                                initial_visible_month=date.today(),
+                                ),
+
             html.Button('Get Data', id='get-data-button', n_clicks=0, className='button'),
             html.Button('Get X Data', id='get-all-data-button', n_clicks=0, className='button'),
             html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button'),
@@ -152,6 +158,9 @@ def main_page_layout():
                                         )
                 ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
+        dcc.Store(id='dataframe-store-1', storage_type='session'),  # Store the first dataframe 
+        dcc.Store(id='dataframe-store-2', storage_type='session'),  # Store the second dataframe
+        dcc.Store(id='dataframe-store-3', storage_type='session'),  # Store the third dataframe
     ])
 
 
