@@ -293,6 +293,8 @@ def display_page(pathname):
      Output('x-axis-dropdown', 'options'),  # Populate X-axis dropdown
      Output('y-axis-dropdown', 'options')],  # Populate Y-axis dropdown (numeric)
     [Input('clear-screen-button', 'n_clicks'),
+     Input('data-date-range', 'start_date'),
+     Input('data-date-range', 'end_date'),
      Input('get-data-button', 'n_clicks'),
      Input('get-all-data-button', 'n_clicks'),
      Input('data-points', 'value'),
@@ -301,10 +303,17 @@ def display_page(pathname):
      Input("btn_csv", "n_clicks"),
      Input("config-button", "n_clicks"),
      Input('url', 'pathname')],
-    [State('store', 'data')],
+    [State('store', 'data'),
+     State('dataframe-store-1', 'data_store_1'),
+     State('dataframe-store-2', 'data_store_2'),
+     State('dataframe-store-3', 'data_store_3')],
     prevent_initial_call=True
 )
-def update_output(na_button, get_data_clicks, get_all_data_clicks, data_pt, db_sel, tbl_sel ,download_cts, config_button, pathname, store_data):
+def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_clicks, data_pt, db_sel, tbl_sel ,download_cts, config_button, pathname, store_data, data_store_1, data_store_2, data_store_3):
+
+    """
+    This function is the main callback function for the main app page. It is used to update the main content containers.
+    """
     ctx = dash.callback_context
 
     if not ctx.triggered:
