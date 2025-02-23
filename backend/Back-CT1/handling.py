@@ -2,21 +2,24 @@
 
 
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import subprocess
 import requests
 import pandas as pd
 import numpy as np 
 from contextlib import asynccontextmanager
+import logging
+
+from typing import Dict, Any
 
 
-
-app = FastAPI()
 
 # Testing use of advanced events as requested by FASTapi deprecation warning 
 
 # https://fastapi.tiangolo.com/advanced/events/
 
+
+logging.basicConfig(filename="fastapi_lifespan_backend.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,22 +31,33 @@ app = FastAPI(lifespan=lifespan)
 
 
 
+@app.post("/rec_req")
+async def rec_req(operation: str = "op", data: Dict[str, Any]=None):
+    """
+    Function to dynamically process different types of incoming Pandas-like data.
+    """
+    try:
+        if not isinstance(data, dict) or "values" not in data:
+            raise HTTPException(status_code=400, detail="Invalid request format")
 
-@app.get("/rec_req")
-def get_data_request(database: str ="null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10):
-    # function to get data from backend and send processed data to request
+        # Convert data to Pandas DataFrame
+        df = pd.DataFrame(data["values"])
+        logging.info(df)
+        logging.info(data)
+        # Get the requested operation
+        
 
-    response = requests.get(f'http://192.168.1.81:8000/data?database={database}&table_name={table_name}&limit={limit}')
+        # Perform dynamic calculations based on operation
+        if operation == "stats":  # Summary statistics
+            result = df.describe().to_dict()
 
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported operation")
 
-    pass
+        logging.info(result)
 
+       
+        return {result}
 
-@app.post("/send_req")
-def send_data_request(config: dict):
-    # function to send data to appropriate LxCT
-    # config will be a dictionary with paramters to pass to the abstraction layer
-
-
-    pass
-
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -17,6 +17,10 @@ import time
 import random
 import plotly.express as px
 from datetime import date
+import logging
+
+
+logging.basicConfig(filename="dash_main.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
 # Load the existing config
 CONFIG_FILE = "config.json"
@@ -106,6 +110,7 @@ def main_page_layout():
         html.Div([
             dcc.DatePickerRange(
                                 id='data-date-range',
+                                display_format='DD/MM/YYYY',
                                 initial_visible_month=date.today(),
                                 ),
 
@@ -339,9 +344,14 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
     if button_id == 'get-data-button' and get_data_clicks > 0:
         store_data['get_data_clicks'] += 1  
         global dataframe
-        data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  
+       # data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  
+
+        data = get_data(store_data['get_data_clicks'])
+        # log data 
+        logging.info(f"Here -------- {data}")
         store_data['onscreen_data'] = data
         dataframe = pd.DataFrame(data)
+        logging.info(f"Here dframe -------- {dataframe}")
 
     elif button_id == 'get-all-data-button' and get_all_data_clicks > 0:
         store_data['onscreen_data'] = []
@@ -421,20 +431,40 @@ def generate_csv_data(data_to_download):
 
    
 
-def get_data(n_clicks, db_sel, tbl_sel):
+def get_data(n_clicks):
     # This function will send a request to the FastAPI server to get data from the database
    
     # use the config file to get the table name and database name
     #database_table_sel = config['databases'][db_sel]['database']['table']
-    endpoint_ip = config['endpoints']['abstraction']['ip']
-    endpoint_port = config['endpoints']['abstraction']['port']
+    endpoint_ip = config['endpoints']['backend']['ip']
+    endpoint_port = config['endpoints']['backend']['port']
+
+    data = {
+    "values": [
+        {"sensor": "A", "reading": 10},
+        {"sensor": "B", "reading": 20},
+        {"sensor": "C", "reading": 30}
+    ]
+    }
 
 
-    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={n_clicks}') # updated to take the table name from the dropdown
+    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats' 
+
+    response = requests.post(url, json=data)
    
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]
-    return response.json()
+    response = response.json()
+
+    logging.info(response)
+
+    #convert to a list of dictionaries
+    data = []
+    for key, value in response.items():
+        data.append({key: value})
+    logging.info(data)
+    
+    return data
 
 def get_data_all(pts, db_sel, tbl_sel):
     
@@ -450,6 +480,15 @@ def get_data_all(pts, db_sel, tbl_sel):
         return [{"Error": "Error in getting data"}]
     return response.json()
 
+
+def send_data_for_processing(*args, **kwargs):
+    # This function will send data to the appropriate LxCT for processing
+
+    endpoint_ip = config['endpoints']['backend']['ip']
+    endpoint_port = config['endpoints']['backend']['port']
+
+
+    pass
 
 
 
