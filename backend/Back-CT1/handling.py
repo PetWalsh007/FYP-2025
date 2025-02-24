@@ -49,15 +49,29 @@ async def rec_req(operation: str = "op", data: Dict[str, Any]=None):
 
         # Perform dynamic calculations based on operation
         if operation == "stats":  # Summary statistics
-            result = df.describe().to_dict()
+            # get average of each column where data is int or float
+            result = df.select_dtypes(include=[np.number]).mean()
+            logging.info(f'testest --- {result}')
+            result = result.to_dict()
+
 
         else:
             raise HTTPException(status_code=400, detail="Unsupported operation")
 
         logging.info(result)
-
-       
-        return {result}
+        result = format_response(result)  # Apply formatting here
+        logging.info(result)
+        return {"processed": result}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+def format_response(result: Dict[str, Any]) -> list:
+    # To ensure we always return a list of dictionaries
+    if isinstance(result, dict):
+        return [{key: value} for key, value in result.items()]
+    elif isinstance(result, list):
+        return result  # Already in correct format
+    else:
+        raise ValueError("Unexpected response format")

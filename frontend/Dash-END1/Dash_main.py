@@ -114,13 +114,28 @@ def main_page_layout():
                                 initial_visible_month=date.today(),
                                 ),
 
-            html.Button('Get Data', id='get-data-button', n_clicks=0, className='button'),
+            html.Button('Process Data', id='process-data', n_clicks=0, className='button'),
             html.Button('Get X Data', id='get-all-data-button', n_clicks=0, className='button'),
             html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button'),
             html.Button("Download CSV", id="btn_csv"),
             html.Button("Config", id="config-button", n_clicks=0, className='button'),
             dcc.Download(id="download-dataframe-csv"),
         ], style=button_style),
+        html.Div([
+            html.Label("Select Data Store:"),
+            
+            dcc.RadioItems(
+                id="store-selector",
+                options=[
+                    {"label": html.Span(" Store 1", id="store-1-label"), "value": "dataframe-store-1"},
+                    {"label": html.Span(" Store 2", id="store-2-label"), "value": "dataframe-store-2"},
+                    {"label": html.Span(" Store 3", id="store-3-label"), "value": "dataframe-store-3"},
+                ],
+                value="dataframe-store-1",
+                labelStyle={'display': 'inline-block', 'marginRight': '10px'}
+            ),
+        ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex', 'justifyContent': 'center'}),
+
         
         html.Div([
             html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
@@ -163,9 +178,9 @@ def main_page_layout():
                                         )
                 ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
-        dcc.Store(id='dataframe-store-1', storage_type='session'),  # Store the first dataframe 
-        dcc.Store(id='dataframe-store-2', storage_type='session'),  # Store the second dataframe
-        dcc.Store(id='dataframe-store-3', storage_type='session'),  # Store the third dataframe
+        dcc.Store(id='dataframe-store-1', storage_type='session', data={}),  # Store the first dataframe 
+        dcc.Store(id='dataframe-store-2', storage_type='session', data={}),  # Store the second dataframe
+        dcc.Store(id='dataframe-store-3', storage_type='session', data={}),  # Store the third dataframe
     ])
 
 
@@ -286,6 +301,37 @@ def display_page(pathname):
         return page2_layout
     return main_page_layout()
 
+
+
+
+
+@app.callback(
+    [Output("store-1-label", "style"),
+     Output("store-2-label", "style"),
+     Output("store-3-label", "style")],
+    [Input("dataframe-store-1", "data"),
+     Input("dataframe-store-2", "data"),
+     Input("dataframe-store-3", "data")],
+    prevent_initial_call=True
+)
+def update_store_colors(store1, store2, store3):
+    logging.debug(f"store1: {store1}, store2: {store2}, store3: {store3}")
+    
+    def get_style(data):
+        has_data = {'color': 'green', 'fontWeight': 'bold', 'backgroundColor': '#DFF2BF', 'padding': '3px 6px', 'borderRadius': '5px'}
+        no_data = {'color': 'blue', 'fontWeight': 'normal', 'backgroundColor': '#FFBABA', 'padding': '3px 6px', 'borderRadius': '5px'}
+        return has_data if data else no_data
+
+    styles = get_style(store1), get_style(store2), get_style(store3)
+    logging.debug(f"styles: {styles}")
+    return styles
+
+
+
+
+
+
+
 # Serves as the callback function for the Dash app to update the content of the output containers
 
 @app.callback(
@@ -300,8 +346,9 @@ def display_page(pathname):
     [Input('clear-screen-button', 'n_clicks'),
      Input('data-date-range', 'start_date'),
      Input('data-date-range', 'end_date'),
-     Input('get-data-button', 'n_clicks'),
+     Input('process-data', 'n_clicks'),
      Input('get-all-data-button', 'n_clicks'),
+     Input('store-selector', 'value'),
      Input('data-points', 'value'),
      Input('database', 'value'),
      Input('table_name', 'value'),
@@ -309,12 +356,12 @@ def display_page(pathname):
      Input("config-button", "n_clicks"),
      Input('url', 'pathname')],
     [State('store', 'data'),
-     State('dataframe-store-1', 'data_store_1'),
-     State('dataframe-store-2', 'data_store_2'),
-     State('dataframe-store-3', 'data_store_3')],
+     State('dataframe-store-1', 'data'),
+     State('dataframe-store-2', 'data'),
+     State('dataframe-store-3', 'data')],
     prevent_initial_call=True
 )
-def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_clicks, data_pt, db_sel, tbl_sel ,download_cts, config_button, pathname, store_data, data_store_1, data_store_2, data_store_3):
+def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_clicks, selected_store ,data_pt, db_sel, tbl_sel ,download_cts, config_button, pathname, store_data, data_store_1, data_store_2, data_store_3):
 
     """
     This function is the main callback function for the main app page. It is used to update the main content containers.
@@ -325,6 +372,14 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+     # Ensure stores are dictionaries
+    if data_store_1 is None:
+        data_store_1 = {}
+    if data_store_2 is None:
+        data_store_2 = {}
+    if data_store_3 is None:
+        data_store_3 = {}
     
     # https://dash.plotly.com/dash-core-components/download
     # Generate CSV data from the current data on the screen
@@ -341,7 +396,7 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         
         return clear_screen(), [], [], store_data, dash.no_update, dash.no_update, [], []  # Clear the content of both output containers, reset click counts, and reset dropdowns
 
-    if button_id == 'get-data-button' and get_data_clicks > 0:
+    if button_id == 'process-data' and get_data_clicks > 0:
         store_data['get_data_clicks'] += 1  
         global dataframe
        # data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  
@@ -352,12 +407,36 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         store_data['onscreen_data'] = data
         dataframe = pd.DataFrame(data)
         logging.info(f"Here dframe -------- {dataframe}")
+        # update data_store_1
+        # Save data to the selected store
+        if selected_store == "dataframe-store-1":
+            data_store_1 = {"data": data}
+        elif selected_store == "dataframe-store-2":
+            data_store_2 = {"data": data}
+        elif selected_store == "dataframe-store-3":
+            data_store_3 = {"data": data}
+
+    elif button_id == 'store-selector':
+        if selected_store == "dataframe-store-1":
+            data = data_store_1.get("data")
+            logging.info(f"Here dframe 1 -------- {data}")
+        elif selected_store == "dataframe-store-2":
+            data = data_store_2.get("data")
+        elif selected_store == "dataframe-store-3":
+            data = data_store_3.get("data")
+
+        dataframe = pd.DataFrame(data)
+
+        column_options = [{"label": col, "value": col} for col in dataframe.columns]
+        numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
+
 
     elif button_id == 'get-all-data-button' and get_all_data_clicks > 0:
         store_data['onscreen_data'] = []
         all_data = get_data_all(data_pt, db_sel, tbl_sel)  
         store_data['get_data_clicks'] = 0  
         dataframe = pd.DataFrame(all_data)
+        logging.info(f"Here dframe  all -------- {dataframe}")
         store_data['onscreen_data'] = dataframe.to_dict('records')
 
     elif button_id == 'config-button':
@@ -368,6 +447,11 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
 
     column_options = [{"label": col, "value": col} for col in dataframe.columns]
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
+
+    #log data stores 1 2 3 
+    logging.info(f"data_store_1: {data_store_1}")
+    logging.info(f"data_store_2: {data_store_2}")
+    logging.info(f"data_store_3: {data_store_3}")
 
     return (
         html.Div([f"Data retrieved for {tbl_sel} in {db_sel}."]),
@@ -457,14 +541,12 @@ def get_data(n_clicks):
     response = response.json()
 
     logging.info(response)
+    # flatten processed in the response
+    response = response['processed']
 
-    #convert to a list of dictionaries
-    data = []
-    for key, value in response.items():
-        data.append({key: value})
-    logging.info(data)
+
     
-    return data
+    return response
 
 def get_data_all(pts, db_sel, tbl_sel):
     
