@@ -12,6 +12,9 @@ import logging
 
 from typing import Dict, Any
 
+import Custom_Fuzzy as fuzzy
+import Custom_DTW as dtw
+
 
 
 # Testing use of advanced events as requested by FASTapi deprecation warning 
@@ -75,3 +78,18 @@ def format_response(result: Dict[str, Any]) -> list:
         return result  # Already in correct format
     else:
         raise ValueError("Unexpected response format")
+    
+
+def configure_data()-> None:
+    """
+    Function to configure the data that has been passed 
+
+    Function is to take the raw data, convert to dframe and 
+    then check the data types of the columns and format a response
+    based on the data types of the columns for processing
+
+    """
+
+
+
+    pass

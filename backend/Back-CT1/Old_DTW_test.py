@@ -1,3 +1,12 @@
+"""
+
+This file contains the implementation of the Dynamic Time Warping (DTW) algorithm that was 
+used as a test during the specification of the project.
+Kept here for documentation purposes.
+
+"""
+
+
 # test DTW implementation
 
 # Script setup to run incremental tests on increasing number of points

@@ -401,7 +401,7 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         global dataframe
        # data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  
 
-        data = get_data(store_data['get_data_clicks'])
+        data = send_data_for_processing(store_data['get_data_clicks'])
         # log data 
         logging.info(f"Here -------- {data}")
         store_data['onscreen_data'] = data
@@ -508,13 +508,13 @@ def update_graph(x_axis, y_axes, g_type ,store_data):
 def clear_screen():
     return ''
 
-def generate_csv_data(data_to_download):
+def generate_csv_data(data_to_download) -> pd.DataFrame:
     # data is in a list of dictionaries format, must convert to pandas dataframe
     df = pd.DataFrame(data_to_download)
     return df
 
    
-
+# Old Function previously used to get increments of data from the database - Now button calls send_data_for_processing
 def get_data(n_clicks):
     # This function will send a request to the FastAPI server to get data from the database
    
@@ -568,7 +568,27 @@ def send_data_for_processing(*args, **kwargs):
 
     endpoint_ip = config['endpoints']['backend']['ip']
     endpoint_port = config['endpoints']['backend']['port']
+    logging.info(f"Sending data for processing to {endpoint_ip}:{endpoint_port}")
+    data = {
+    "values": [
+        {"sensor": "A", "reading": 10},
+        {"sensor": "B", "reading": 20},
+        {"sensor": "C", "reading": 30}
+    ]}
+    
+    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats' 
 
+    response = requests.post(url, json=data)
+    
+    if response.status_code == 500:
+        return [{"Error": "Error in getting data"}]
+    response = response.json()
+
+    logging.info(f"Response Rec: {response}")
+    # flatten processed in the response
+    response = response['processed']
+
+    return response
 
     pass
 
