@@ -27,8 +27,14 @@ logging.basicConfig(filename="fastapi_lifespan_backend.log", level=logging.INFO,
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Define Startup tasks
+    logging.info("------------------------------")  # Log separator
+    logging.info("Starting up handling.py...")  # Log startup event
+    
     yield
     # Define Shutdown tasks
+
+    logging.info("Shutting down handling.py...")  # Log shutdown event
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -38,6 +44,7 @@ app = FastAPI(lifespan=lifespan)
 async def rec_req(operation: str = "op", data: Dict[str, Any]=None):
     """
     Function to dynamically process different types of incoming Pandas-like data.
+    operation param is sent along with the data to indicate the type of processing required.
     """
     try:
         if not isinstance(data, dict) or "values" not in data:
@@ -45,8 +52,8 @@ async def rec_req(operation: str = "op", data: Dict[str, Any]=None):
 
         # Convert data to Pandas DataFrame
         df = pd.DataFrame(data["values"])
-        logging.info(df)
-        logging.info(data)
+        #logging.info(df)
+        #logging.info(data)
         # Get the requested operation
         
 
@@ -61,9 +68,9 @@ async def rec_req(operation: str = "op", data: Dict[str, Any]=None):
         else:
             raise HTTPException(status_code=400, detail="Unsupported operation")
 
-        logging.info(result)
+        #logging.info(result)
         result = format_response(result)  # Apply formatting here
-        logging.info(result)
+        #logging.info(result)
         return {"processed": result}
 
     except Exception as e:

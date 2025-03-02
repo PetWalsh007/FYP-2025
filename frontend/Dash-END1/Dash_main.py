@@ -18,9 +18,21 @@ import random
 import plotly.express as px
 from datetime import date
 import logging
+import redis as rd
 
 
 logging.basicConfig(filename="dash_main.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+
+redis_host ='192.168.1.86'
+redis_port = 6379
+
+try:
+    redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+    redis_client.ping()
+    logging.info("Connected to Redis server successfully.")
+except rd.ConnectionError as e:
+    logging.error(f"Redis connection error: {e}")
+
 
 # Load the existing config
 CONFIG_FILE = "config.json"
@@ -477,7 +489,7 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
 def update_graph(x_axis, y_axes, g_type ,store_data):
     """Plots selected data from stored dataset."""
     if not store_data or "onscreen_data" not in store_data or not store_data["onscreen_data"]:
-        return px.scatter(title="No Data Available. Fetch Data First.")
+        return px.pie(title="No Data Available. Fetch Data First.")
 
     df = pd.DataFrame(store_data["onscreen_data"])
 
@@ -558,6 +570,14 @@ def get_data_all(pts, db_sel, tbl_sel):
     
     response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}') # updated to take the table name from the dropdown
 
+    # send response to redis first 
+    json_data = response.json()
+    try:
+        redis_client.set('data_response', json.dumps(json_data))
+    except Exception as e:
+        logging.error(f"Redis error: {e}")
+        return [{"Error": "Error in getting data"}]
+
     if response.status_code == 500:
         return [{"Error": "Error in getting data"}]
     return response.json()
@@ -590,7 +610,6 @@ def send_data_for_processing(*args, **kwargs):
 
     return response
 
-    pass
 
 
 
