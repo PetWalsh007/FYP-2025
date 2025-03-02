@@ -569,18 +569,29 @@ def get_data_all(pts, db_sel, tbl_sel):
     endpoint_port = config['endpoints']['abstraction']['port']
     
     response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}') # updated to take the table name from the dropdown
-
+    response_json = response.json()
     # send response to redis first 
-    json_data = response.json()
-    try:
-        redis_client.set('data_response', json.dumps(json_data))
-    except Exception as e:
-        logging.error(f"Redis error: {e}")
-        return [{"Error": "Error in getting data"}]
 
-    if response.status_code == 500:
-        return [{"Error": "Error in getting data"}]
-    return response.json()
+    if False:
+        json_data = response.json()
+        try:
+            redis_client.set('data_response', json.dumps(json_data))
+        except Exception as e:
+            logging.error(f"Redis error: {e}")
+            return [{"Error": "Error in getting data"}]
+
+        if response.status_code == 500:
+            return [{"Error": "Error in getting data"}]
+        return response.json()
+    else:
+        # response is the key to get data from redis
+        redis_key = response_json.get("redis_key")
+        logging.info(f"Redis key: {redis_key}")
+        # get data from redis
+        redis_data = redis_client.get(redis_key)
+        # format data which was sent to redis as result = result.to_dict(orient='records')
+        redis_data = json.loads(redis_data)
+        return redis_data
 
 
 def send_data_for_processing(*args, **kwargs):

@@ -67,7 +67,7 @@ async def lifespan(app):
 app = FastAPI(lifespan=lifespan)
 
 
-
+# https://stackoverflow.com/questions/10252010/serializing-class-instance-to-json 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, datetime):
@@ -86,7 +86,9 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             #result = result.to_dict(orient='records')
             # Send data to Redis with a random key and return the key
             logging.info(f"Storing result in Redis with random key")
-            rand_number = random.randint(1, 1000000)
+            rand_number = random.randint(1, 10000)
+            # add 5 random alpha chars to the rand_number
+            rand_number = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=5))
             logging.info(f"Generated random key: {rand_number}")
             try:
                 redis_client.set(rand_number, json.dumps(result, default=json_serial))
