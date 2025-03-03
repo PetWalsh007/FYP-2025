@@ -139,9 +139,9 @@ def main_page_layout():
             dcc.RadioItems(
                 id="store-selector",
                 options=[
-                    {"label": html.Span(" Store 1", id="store-1-label"), "value": "dataframe-store-1"},
-                    {"label": html.Span(" Store 2", id="store-2-label"), "value": "dataframe-store-2"},
-                    {"label": html.Span(" Store 3", id="store-3-label"), "value": "dataframe-store-3"},
+                    {"label": html.Span("Store 1", id="store-1-label"), "value": "dataframe-store-1"},
+                    {"label": html.Span("Store 2", id="store-2-label"), "value": "dataframe-store-2"},
+                    {"label": html.Span("Store 3", id="store-3-label"), "value": "dataframe-store-3"},
                 ],
                 value="dataframe-store-1",
                 labelStyle={'display': 'inline-block', 'marginRight': '10px'}
@@ -159,8 +159,8 @@ def main_page_layout():
                         options= [
                                     {"label": f"{db_name.upper()} - {table}", "value": table}
                                     for db_name, db_info in config["databases"].items()
-                                    for table in db_info["database"].get("tables", [])
-                                ],  # Dynamically loads all tables
+                                        for table in db_info["database"].get("tables", [])
+                                ],  # Dynamically loads all tables from the config file
                         value=None,
                         placeholder="Select a Table",
                         style={'fontSize': '18px', 'width': '250px'}
@@ -175,7 +175,7 @@ def main_page_layout():
                                                    {'label': 'Bar', 'value': 'bar'}, {'label': 'Box', 'value': 'box'},
                                                     {'label': 'Histogram', 'value': 'histogram'},
                                                     {'label': 'Pie', 'value': 'pie'},
-                                                   ], value='scatter', style={'width': '150px'}),
+                                                   ], value='Pie', style={'width': '150px'}),
         ], style={'display': 'flex', 'gap': '10px', 'margin': '20px'}),
 
         dcc.Graph(id="data-plot"),  
@@ -186,13 +186,13 @@ def main_page_layout():
                                         data=[],  # defualt empty data
                                         filter_action="native",
                                         sort_action="native",
-                                        page_size=1500   
+                                        page_size=200   
                                         )
                 ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
-        dcc.Store(id='dataframe-store-1', storage_type='session', data={}),  # Store the first dataframe 
-        dcc.Store(id='dataframe-store-2', storage_type='session', data={}),  # Store the second dataframe
-        dcc.Store(id='dataframe-store-3', storage_type='session', data={}),  # Store the third dataframe
+        dcc.Store(id='dataframe-store-1', storage_type='session', data={'collected_data_1':[]}),  # Store the first dataframe 
+        dcc.Store(id='dataframe-store-2', storage_type='session', data={'collected_data_2':[]}),  # Store the second dataframe
+        dcc.Store(id='dataframe-store-3', storage_type='session', data={'collected_data_3':[]}),  # Store the third dataframe
     ])
 
 
@@ -315,8 +315,6 @@ def display_page(pathname):
 
 
 
-
-
 @app.callback(
     [Output("store-1-label", "style"),
      Output("store-2-label", "style"),
@@ -326,20 +324,36 @@ def display_page(pathname):
      Input("dataframe-store-3", "data")],
     prevent_initial_call=True
 )
-def update_store_colors(store1, store2, store3):
-    logging.debug(f"store1: {store1}, store2: {store2}, store3: {store3}")
-    
-    def get_style(data):
-        has_data = {'color': 'green', 'fontWeight': 'bold', 'backgroundColor': '#DFF2BF', 'padding': '3px 6px', 'borderRadius': '5px'}
+def update_store_colours(store1, store2, store3):
+
+    logging.info(f'In the Update Store Colours Callback')
+    try:
+        
+        logging.info(f'In the Update Store Colours Callback - 2')
+        return get_style(store1), get_style(store2), get_style(store3)
+
+    except Exception as e:
+        logging.error(f"Error in update_store_colours: {e}")
+        return {}, {}, {}
+
+
+def get_style(data):
+    try:
+        logging.info(f'In the get_style function')
+        has_data = {'color': 'black', 'fontWeight': 'bold', 'backgroundColor': '#DFF2BF', 'padding': '3px 6px', 'borderRadius': '5px'}
         no_data = {'color': 'blue', 'fontWeight': 'normal', 'backgroundColor': '#FFBABA', 'padding': '3px 6px', 'borderRadius': '5px'}
-        return has_data if data else no_data
-
-    styles = get_style(store1), get_style(store2), get_style(store3)
-    logging.debug(f"styles: {styles}")
-    return styles
-
-
-
+        if data is None:
+            logging.info('Here in get_style: data is None --- 1 ')
+            return no_data
+        if data:
+            logging.info('Here in get_style: data is populated')
+            return has_data
+        logging.info('Here in get_style: data is None')
+        return no_data
+    except Exception as e:
+        logging.error(f"Error in get_style: {e}")
+        return  {'color': 'blue', 'fontWeight': 'normal', 'backgroundColor': '#FFBABA', 'padding': '3px 6px', 'borderRadius': '5px'}
+     
 
 
 
@@ -387,7 +401,13 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
 
      # Ensure stores are dictionaries
     if data_store_1 is None:
-        data_store_1 = {}
+        data_store_1 = {
+            "collected_data_1": [
+            {"sensor": "A", "reading": 10},
+            {"sensor": "B", "reading": 20},
+            {"sensor": "C", "reading": 30}
+            ]
+        }
     if data_store_2 is None:
         data_store_2 = {}
     if data_store_3 is None:
@@ -415,10 +435,10 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
 
         data = send_data_for_processing(store_data['get_data_clicks'])
         # log data 
-        logging.info(f"Here -------- {data}")
+        #logging.info(f"Here -------- {data}")
         store_data['onscreen_data'] = data
         dataframe = pd.DataFrame(data)
-        logging.info(f"Here dframe -------- {dataframe}")
+        #logging.info(f"Here dframe -------- {dataframe}")
         # update data_store_1
         # Save data to the selected store
         if selected_store == "dataframe-store-1":
@@ -431,7 +451,6 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
     elif button_id == 'store-selector':
         if selected_store == "dataframe-store-1":
             data = data_store_1.get("data")
-            logging.info(f"Here dframe 1 -------- {data}")
         elif selected_store == "dataframe-store-2":
             data = data_store_2.get("data")
         elif selected_store == "dataframe-store-3":
@@ -450,6 +469,16 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         dataframe = pd.DataFrame(all_data)
         logging.info(f"Here dframe  all -------- {dataframe}")
         store_data['onscreen_data'] = dataframe.to_dict('records')
+        if selected_store == "dataframe-store-1":
+            data_store_1['collected_data_1'] = dataframe.to_dict('records')
+            logging.info(f"Here dframe  all -------- {data_store_1}")
+            logging.info(f'the data type of data_store_1 is {type(data_store_1)}')
+        elif selected_store == "dataframe-store-2":
+            data_store_2['collected_data_2'] = dataframe.to_dict('records')
+        elif selected_store == "dataframe-store-3":
+            data_store_3['collected_data_3'] = dataframe.to_dict('records')
+        else:
+            pass
 
     elif button_id == 'config-button':
         return dash.no_update, dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update, dash.no_update, dash.no_update 
@@ -460,10 +489,6 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
     column_options = [{"label": col, "value": col} for col in dataframe.columns]
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
 
-    #log data stores 1 2 3 
-    logging.info(f"data_store_1: {data_store_1}")
-    logging.info(f"data_store_2: {data_store_2}")
-    logging.info(f"data_store_3: {data_store_3}")
 
     return (
         html.Div([f"Data retrieved for {tbl_sel} in {db_sel}."]),
@@ -571,7 +596,7 @@ def get_data_all(pts, db_sel, tbl_sel):
     response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}') # updated to take the table name from the dropdown
     response_json = response.json()
     # send response to redis first 
-
+    logging.info(f"Response Rec: {response_json}")
     if False:
         json_data = response.json()
         try:

@@ -83,20 +83,8 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
             logging.info(f"Executing SQL Server query: {query}")
             result = await sql_server(query)
-            #result = result.to_dict(orient='records')
-            # Send data to Redis with a random key and return the key
-            logging.info(f"Storing result in Redis with random key")
-            rand_number = random.randint(1, 10000)
-            # add 5 random alpha chars to the rand_number
-            rand_number = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=5))
-            logging.info(f"Generated random key: {rand_number}")
-            try:
-                redis_client.set(rand_number, json.dumps(result, default=json_serial))
-                logging.info(f"Stored result in Redis with key: {rand_number}")
-            except Exception as e:
-                logging.error(f"Error storing result in Redis: {e}")
-                return {"error": "Error storing result in Redis"}
-            return {"redis_key": rand_number}
+            redis_db_key = send_to_redis(result)
+            return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
     # Check if the database is PostgreSQL
@@ -105,7 +93,8 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             query = f"SELECT * from {table_name} LIMIT {limit}"
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await postgres(query)
-            return result
+            redis_db_key = send_to_redis(result)
+            return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
     else:
@@ -155,3 +144,20 @@ async def postgres(query):
 
     return result
 
+
+# function to send to redis
+
+def send_to_redis(redis_value):
+    # Send data to Redis with a random key and return the key to the call which returns to user
+    logging.info(f"Storing result in Redis with random key")
+    rand_number = random.randint(1, 1000)
+    # add 5 random alpha chars to the rand_number to make it unique
+    redis_key = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=5))
+    logging.info(f"Generated random key: {redis_key}")
+    try:
+        redis_client.set(redis_key, json.dumps(redis_value, default=json_serial))
+        logging.info(f"Stored result in Redis with key: {redis_key}")
+    except Exception as e:
+        logging.error(f"Error storing result in Redis: {e}")
+        return {"Error storing result in Redis"}
+    return redis_key
