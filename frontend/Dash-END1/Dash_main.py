@@ -399,19 +399,7 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-     # Ensure stores are dictionaries
-    if data_store_1 is None:
-        data_store_1 = {
-            "collected_data_1": [
-            {"sensor": "A", "reading": 10},
-            {"sensor": "B", "reading": 20},
-            {"sensor": "C", "reading": 30}
-            ]
-        }
-    if data_store_2 is None:
-        data_store_2 = {}
-    if data_store_3 is None:
-        data_store_3 = {}
+
     
     # https://dash.plotly.com/dash-core-components/download
     # Generate CSV data from the current data on the screen
@@ -448,18 +436,26 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         elif selected_store == "dataframe-store-3":
             data_store_3 = {"data": data}
 
+    # here the defaults get printed on each switch - must check on the collected_data_1 atribute        
+
     elif button_id == 'store-selector':
         if selected_store == "dataframe-store-1":
-            data = data_store_1.get("data")
+            data = data_store_1.get("collected_data_1", [{"col1": "default1", "col2": "default2"}])
         elif selected_store == "dataframe-store-2":
-            data = data_store_2.get("data")
+            data = data_store_2.get("collected_data_2", [{"col1": "default112", "col242": "default232"}])
         elif selected_store == "dataframe-store-3":
-            data = data_store_3.get("data")
+            data = data_store_3.get("collected_data_3", [{"col1": "default113", "col211": "default23232"}])
+        else:
+            data = [{"col1": "No data", "col2": "No data"}]
 
+        # Ensure `dataframe` is defined
         dataframe = pd.DataFrame(data)
+        store_data['onscreen_data'] = dataframe.to_dict('records')
 
         column_options = [{"label": col, "value": col} for col in dataframe.columns]
         numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
+
+        return dash.no_update, [{"name": i, "id": i} for i in dataframe.columns], store_data["onscreen_data"], store_data, dash.no_update, dash.no_update, column_options, numeric_columns
 
 
     elif button_id == 'get-all-data-button' and get_all_data_clicks > 0:
@@ -471,12 +467,16 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         store_data['onscreen_data'] = dataframe.to_dict('records')
         if selected_store == "dataframe-store-1":
             data_store_1['collected_data_1'] = dataframe.to_dict('records')
-            logging.info(f"Here dframe  all -------- {data_store_1}")
+            logging.info(f"Here dframe  all 1-------- {data_store_1}")
             logging.info(f'the data type of data_store_1 is {type(data_store_1)}')
         elif selected_store == "dataframe-store-2":
             data_store_2['collected_data_2'] = dataframe.to_dict('records')
+            logging.info(f"Here dframe  all 2-------- {data_store_2}")
+            logging.info(f'the data type of data_store_2 is {type(data_store_2)}')
         elif selected_store == "dataframe-store-3":
             data_store_3['collected_data_3'] = dataframe.to_dict('records')
+            logging.info(f"Here dframe  all 3-------- {data_store_3}")
+            logging.info(f'the data type of data_store_3 is {type(data_store_3)}')
         else:
             pass
 
