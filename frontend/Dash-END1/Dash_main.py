@@ -40,8 +40,12 @@ CONFIG_FILE = "config.json"
 dataframe = pd.DataFrame()
 
 def load_config():
-    with open(CONFIG_FILE, "r") as file:
-        return json.load(file)
+    try:
+        with open(CONFIG_FILE, "r") as file:
+            return json.load(file)
+    except Exception as e:
+        logging.error(f"Error loading config file: {e}")
+        return {}
 
 def save_config(config_data):
     with open(CONFIG_FILE, "w") as file:
@@ -190,9 +194,9 @@ def main_page_layout():
                                         )
                 ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
-        dcc.Store(id='dataframe-store-1', storage_type='session', data={'collected_data_1':[]}),  # Store the first dataframe 
-        dcc.Store(id='dataframe-store-2', storage_type='session', data={'collected_data_2':[]}),  # Store the second dataframe
-        dcc.Store(id='dataframe-store-3', storage_type='session', data={'collected_data_3':[]}),  # Store the third dataframe
+        dcc.Store(id='dataframe-store-1',  data={'collected_data_1':[]}),  # Store the first dataframe 
+        dcc.Store(id='dataframe-store-2',  data={'collected_data_2':[]}),  # Store the second dataframe
+        dcc.Store(id='dataframe-store-3',  data={'collected_data_3':[]}),  # Store the third dataframe
     ])
 
 
@@ -399,7 +403,8 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-
+    global dataframe
+    logging.info(f"Dataframe 1 has this data while going through script start ---- {data_store_1}")
     
     # https://dash.plotly.com/dash-core-components/download
     # Generate CSV data from the current data on the screen
@@ -418,7 +423,7 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
 
     if button_id == 'process-data' and get_data_clicks > 0:
         store_data['get_data_clicks'] += 1  
-        global dataframe
+        
        # data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  
 
         data = send_data_for_processing(store_data['get_data_clicks'])
@@ -430,7 +435,7 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         # update data_store_1
         # Save data to the selected store
         if selected_store == "dataframe-store-1":
-            data_store_1 = {"data": data}
+            data_store_1["data"] = data
         elif selected_store == "dataframe-store-2":
             data_store_2 = {"data": data}
         elif selected_store == "dataframe-store-3":
@@ -439,23 +444,22 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
     # here the defaults get printed on each switch - must check on the collected_data_1 atribute        
 
     elif button_id == 'store-selector':
+        logging.info(f"Here in the store selector -----#######")
+        logging.info(f"Here in the store selector -----{selected_store}")
         if selected_store == "dataframe-store-1":
-            data = data_store_1.get("collected_data_1", [{"col1": "default1", "col2": "default2"}])
+            logging.info(f"Here in the store selector -----{data_store_1}")
+            data = data_store_1.get("collected_data_1", [])
         elif selected_store == "dataframe-store-2":
-            data = data_store_2.get("collected_data_2", [{"col1": "default112", "col242": "default232"}])
+            logging.info(f"Here in the store selector -----{data_store_2}")
+            data = data_store_2.get("collected_data_2", [])
         elif selected_store == "dataframe-store-3":
-            data = data_store_3.get("collected_data_3", [{"col1": "default113", "col211": "default23232"}])
+            logging.info(f"Here in the store selector -----{data_store_3}")
+            data = data_store_3.get("collected_data_3", [])
         else:
-            data = [{"col1": "No data", "col2": "No data"}]
+            data = []
 
-        # Ensure `dataframe` is defined
         dataframe = pd.DataFrame(data)
         store_data['onscreen_data'] = dataframe.to_dict('records')
-
-        column_options = [{"label": col, "value": col} for col in dataframe.columns]
-        numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
-
-        return dash.no_update, [{"name": i, "id": i} for i in dataframe.columns], store_data["onscreen_data"], store_data, dash.no_update, dash.no_update, column_options, numeric_columns
 
 
     elif button_id == 'get-all-data-button' and get_all_data_clicks > 0:
@@ -484,7 +488,8 @@ def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_c
         return dash.no_update, dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update, dash.no_update, dash.no_update 
 
     else:
-        return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        #return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        pass
 
     column_options = [{"label": col, "value": col} for col in dataframe.columns]
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
