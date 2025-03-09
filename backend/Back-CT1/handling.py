@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np 
 from contextlib import asynccontextmanager
 import logging
+import redis as rd
 
 from typing import Dict, Any
 
@@ -17,12 +18,26 @@ import Custom_DTW as dtw
 
 
 
-# Testing use of advanced events as requested by FASTapi deprecation warning 
+# Testing use of advanced events - Lifespan Events - as requested by FASTapi deprecation warning 
 
 # https://fastapi.tiangolo.com/advanced/events/
 
 
 logging.basicConfig(filename="fastapi_lifespan_backend.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+
+logging.info("Starting FastAPI lifespan function...")
+
+redis_host ='192.168.1.86'
+redis_port = 6379
+
+try:
+    redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+    redis_client.ping()
+    logging.info("Connected to Redis server successfully.")
+except rd.ConnectionError as e:
+    logging.error(f"Redis connection error: {e}")
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -79,12 +94,15 @@ async def rec_req(operation: str = "op", data: Dict[str, Any]=None):
 
 def format_response(result: Dict[str, Any]) -> list:
     # To ensure we always return a list of dictionaries
-    if isinstance(result, dict):
-        return [{key: value} for key, value in result.items()]
-    elif isinstance(result, list):
-        return result  # Already in correct format
-    else:
-        raise ValueError("Unexpected response format")
+    try:
+        if isinstance(result, dict):
+            return [{key: value} for key, value in result.items()]
+        elif isinstance(result, list):
+            return result  # Already in correct format
+        else:
+            raise ValueError("Unexpected response format")
+    except Exception as e:
+        logging.error(f"Error formatting response: {str(e)}")
     
 
 def configure_data()-> None:

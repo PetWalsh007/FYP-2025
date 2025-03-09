@@ -23,7 +23,7 @@ import redis as rd
 
 logging.basicConfig(filename="dash_main.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
-redis_host ='192.168.1.86'
+redis_host ='192.168.1.83'
 redis_port = 6379
 
 try:
