@@ -24,12 +24,14 @@ redis_host ='192.168.1.83'
 redis_port = 6379
 # Updated from FASTAPI docs to use async context manager https://fastapi.tiangolo.com/advanced/events/#lifespan
 
+
 @asynccontextmanager
 async def lifespan(app):
     # Runs at FastAPI startup
     global sqls_con 
     global postgres_con 
     global redis_client
+    global postgres_server_con
     logging.info("Starting FastAPI lifespan function...")
     sqls_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
     
@@ -40,6 +42,12 @@ async def lifespan(app):
         connection_username="test_user",
         connection_password="test_user"
     )
+
+    # connect to backend Postgres DB 
+    logging.info("Connecting to Postgres Server database...")
+
+    
+    postgres_server_con = open_server_db_con()
 
     logging.info("Database connections initialized.")
     logging.info("***********************************")
@@ -59,8 +67,14 @@ async def lifespan(app):
     # Closing connection when the worker shuts down
     if sqls_con:
         sqls_con.close_connection()
+
     if postgres_con:
         postgres_con.close_connection()
+    if postgres_server_con:
+        postgres_server_con.close_connection()
+    if redis_client:
+        redis_client.close()
+    
 
     logging.info("Database connections closed.")
 
@@ -84,6 +98,8 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             logging.info(f"Executing SQL Server query: {query}")
             result = await sql_server(query)
             redis_db_key = send_to_redis(result)
+            # we need to send to postgres server db to store key id etc 
+            store_query_data(redis_db_key, query)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -114,6 +130,39 @@ async def get_command(rst: str = "null"):
     else:
         return {"error": "No command provided"}
     
+
+def store_query_data(key, qry):
+    # this will take the redis key and the query and store iin the data base 
+
+
+    # we will use the connection object created globally
+    logging.info(f"Received request for /store_query_data")
+    # send query to postgres server db
+    if postgres_server_con.conn is None:
+        if postgres_server_con.con_err:
+            logging.error(f"Postgres Server connection error: {postgres_server_con.con_err}")
+            return postgres_server_con.con_err
+        else:
+            logging.error("Postgres Server connection not established")
+            return {"error": "SQL Server connection not established"}
+    
+    table = "redis_data.redis_cache_log"
+    query = f"INSERT INTO {table} (redis_key, query_text) VALUES ('{key}', '{qry}')"
+    logging.info(f"Executing Postgres Server query: {query}")
+    # execute the query
+    # we have no query func for this so we will use the execute method
+    try:
+        postgres_server_con.cursor.execute(query)
+        postgres_server_con.conn.commit()
+        logging.info(f"Query executed successfully: {query}")
+    except Exception as e:
+        logging.error(f"Error executing query: {e}")
+        return {"error": "Error executing query"}
+
+
+
+
+
     
 # Function to query SQL Server database
 async def sql_server(query):
@@ -161,3 +210,28 @@ def send_to_redis(redis_value):
         logging.error(f"Error storing result in Redis: {e}")
         return {"Error storing result in Redis"}
     return redis_key
+
+
+def open_server_db_con():
+    # Open the connection to the server side database
+    logging.info("Opening connection to server side database...")
+    try:
+        with open('pwd.json') as json_file:
+            data = json.load(json_file)
+            postgres_con2 = connectcls_postgres(
+                driver_name="PostgreSQL Unicode",
+                server_name='192.168.1.86',
+                db_name='FYP-DB-01',
+                connection_username='localadmin',
+                connection_password='localadmin'
+            )
+
+        logging.info(f"Postgres Server connection established: {postgres_con2}")
+        logging.info(f"data returned from connection: {postgres_con2.conn}, {postgres_con2.cursor}, {postgres_con2.con_err}")
+        logging.info(f"Postgres Server connection established: {postgres_con2.conn is not None}")
+        return postgres_con2
+    except Exception as e:
+        logging.error(f"Error While starting connection to backend database server: {e}")
+        postgres_con2 = None
+        return postgres_con2
+    

@@ -99,7 +99,7 @@ class connectcls_postgres:
         self.conn, self.cursor, self.con_err = self.make_connection()
 
     def __str__(self):
-        return f'Connection ID: {self.connection_id}, User ID: {self.user_id}, Connection Name: {self.connection_name}, Connection Type: {self.connection_type}, Connection URL: {self.connection_url}, Connection Port: {self.connection_port}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
+        return f'Driver Name: {self.driver_name}, Server Name: {self.server_name}, Database Name: {self.db_name}, Port: {self.port}, Connection Username: {self.connection_username}, Connection Password: {self.connection_password}'
 
     def connect_str(self):
         # connection string 

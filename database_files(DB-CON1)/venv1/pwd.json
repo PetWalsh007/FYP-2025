@@ -1,0 +1,13 @@
+{
+    "postgres": {
+        "host": "192.168.1.86",
+        "uname": "localadmin",
+        "password": "localadmin",
+        "port": "5432",
+        "db_name": "FYP-DB-01"
+    },
+    "schema": [
+        "json-config",
+        "redis-data"
+    ]
+}
