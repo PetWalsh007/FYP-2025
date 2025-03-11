@@ -110,6 +110,7 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await postgres(query)
             redis_db_key = send_to_redis(result)
+            store_query_data(redis_db_key, query)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -149,8 +150,8 @@ def store_query_data(key, qry):
     table = "redis_data.redis_cache_log"
     query = f"INSERT INTO {table} (redis_key, query_text) VALUES ('{key}', '{qry}')"
     logging.info(f"Executing Postgres Server query: {query}")
-    # execute the query
-    # we have no query func for this so we will use the execute method
+    # execute and commit the query
+
     try:
         postgres_server_con.cursor.execute(query)
         postgres_server_con.conn.commit()
