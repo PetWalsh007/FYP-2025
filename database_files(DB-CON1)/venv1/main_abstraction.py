@@ -99,7 +99,7 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             result = await sql_server(query)
             redis_db_key = send_to_redis(result)
             # we need to send to postgres server db to store key id etc 
-            store_query_data(redis_db_key, query)
+            store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -110,7 +110,7 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await postgres(query)
             redis_db_key = send_to_redis(result)
-            store_query_data(redis_db_key, query)
+            store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -132,7 +132,7 @@ async def get_command(rst: str = "null"):
         return {"error": "No command provided"}
     
 
-def store_query_data(key, qry):
+def store_query_data(key, qry, query_table, query_db):
     # this will take the redis key and the query and store iin the data base 
 
 
@@ -148,7 +148,7 @@ def store_query_data(key, qry):
             return {"error": "SQL Server connection not established"}
     
     table = "redis_data.redis_cache_log"
-    query = f"INSERT INTO {table} (redis_key, query_text) VALUES ('{key}', '{qry}')"
+    query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table) VALUES ('{key}', '{qry}', '{query_db}', '{query_table}')"
     logging.info(f"Executing Postgres Server query: {query}")
     # execute and commit the query
 
@@ -221,10 +221,10 @@ def open_server_db_con():
             data = json.load(json_file)
             postgres_con2 = connectcls_postgres(
                 driver_name="PostgreSQL Unicode",
-                server_name='192.168.1.86',
-                db_name='FYP-DB-01',
-                connection_username='localadmin',
-                connection_password='localadmin'
+                server_name=data['postgres']['host'],
+                db_name=data['postgres']['db_name'],
+                connection_username=data['postgres']['uname'],
+                connection_password=data['postgres']['password']
             )
 
         logging.info(f"Postgres Server connection established: {postgres_con2}")
