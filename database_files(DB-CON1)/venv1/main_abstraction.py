@@ -205,7 +205,7 @@ def send_to_redis(redis_value):
     redis_key = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=5))
     logging.info(f"Generated random key: {redis_key}")
     try:
-        redis_client.set(redis_key, json.dumps(redis_value, default=json_serial))
+        redis_client.set(redis_key, json.dumps(redis_value, default=json_serial), ex=3600)  # Set TTL to 1 hour
         logging.info(f"Stored result in Redis with key: {redis_key}")
     except Exception as e:
         logging.error(f"Error storing result in Redis: {e}")
