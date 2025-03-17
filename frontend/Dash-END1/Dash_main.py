@@ -102,6 +102,12 @@ button_style = {
     'justifyContent': 'center'
 }
 
+button_style2 = {
+    'fontSize': '16px',
+    'padding': '10px 20px',
+    'marginRight': '10px'
+}
+
 text_style1 = { 
     'textAlign': 'center',
     'marginBottom': '20px',
@@ -147,30 +153,32 @@ def main_page_layout():
                 style=dev_style),
         html.Div([
             dcc.DatePickerRange(
-                                id='data-date-range',
-                                display_format='DD/MM/YYYY',
-                                initial_visible_month=date.today(),
-                                ),
+                id='data-date-range',
+                display_format='DD/MM/YYYY',
+                initial_visible_month=date.today(),
+                style={'marginBottom': '10px', 'fontSize': '16px'}
+            ),
 
-            html.Button('Process Data', id='process-data', n_clicks=0, className='button'),
-            html.Button('Get Raw Data', id='get-all-data-button', n_clicks=0, className='button'),
-            html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button'),
-            html.Button("Download CSV", id="btn_csv"),
-            html.Button("Config", id="config-button", n_clicks=0, className='button'),
+            html.Button('Process Data', id='process-data', n_clicks=0, className='button', style=button_style2),
+            html.Button('Get Raw Data', id='get-all-data-button', n_clicks=0, className='button', style=button_style2),
+            html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button', style=button_style2),
+            html.Button("Download CSV", id="btn_csv", className='button', style=button_style2),
+            html.Button("Config", id="config-button", n_clicks=0, className='button', style={**button_style2, 'marginRight': '0px'}),
+
             dcc.Download(id="download-dataframe-csv"),
-        ], style=button_style),
+        ], style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop': '20px', 'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'center', 'gap': '10px'}),
         html.Div([
-                    html.Label("Stored Redis Keys from this Session:"),
-                    html.Div(id="available-keys-container", style={'marginBottom': '10px'}),
+            html.Label("Stored Redis Keys from this Session:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
+            html.Div(id="available-keys-container", style={'marginBottom': '10px', 'textAlign': 'center'}),
 
-                    html.Label("Enter Redis Key to Retrieve Data:"),
-                    dcc.Input(id='redis-key-entry', type='text', placeholder="Enter Redis Key", style={'marginRight': '10px'}),
-                    
-                    html.Button("Retrieve Data from Redis", id="fetch-from-redis-button", n_clicks=0, className='button'),
+            html.Label("Enter Redis Key to Retrieve Data:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
+            dcc.Input(id='redis-key-entry', type='text', placeholder="Enter Redis Key", style={'marginRight': '10px', 'fontSize': '16px', 'padding': '5px'}),
 
-                    # Hidden store to keep track of Redis keys
-                    dcc.Store(id='redis-key-store', data=[]),
-                        ], style={'marginTop': '20px', 'textAlign': 'center'}),
+            html.Button("Retrieve Data from Redis", id="fetch-from-redis-button", n_clicks=0, className='button', style=button_style),
+
+            # Hidden store to keep track of Redis keys
+            dcc.Store(id='redis-key-store', data=[]),
+        ], style={'marginTop': '20px', 'textAlign': 'left', 'padding': '20px', 'border': '1px solid #ccc', 'borderRadius': '5px', 'backgroundColor': '#f9f9f9'}),
         # html.Div([
         #     html.Label("Select Data Store:"),
             
@@ -472,7 +480,6 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
 
     # Updated to now only fetch the data from Redis when a user clicks the retrieve data from redis button 
     if button_id == 'fetch-from-redis-button' :
-        # Fetch data from Redis while checking if the user has entered a valid key - or take the last key or if no keys let = none and skip
         redis_key = manual_key_entry or (redis_key_store[-1] if redis_key_store else None)
         if redis_key:
             try:
@@ -531,7 +538,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
 
     return (
-        html.Div([f"Data retrieved for {tbl_sel} in {db_sel}."]),
+        html.Div([""]),
         [{"name": i, "id": i} for i in dataframe.columns],  # Table Columns
         store_data["onscreen_data"],  # Table Data
         store_data,  # Store Data for visualization

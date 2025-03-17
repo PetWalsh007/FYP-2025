@@ -14,15 +14,15 @@ REDIS_MEMORY=$(redis-cli info memory | grep used_memory_rss_human | awk -F ':' '
 echo "$(date) - Redis RSS Memory Usage: ${REDIS_MEMORY} MB" >> $LOG_FILE
 
 # Check if memory exceeds threshold
-if (( $(echo "$REDIS_MEMORY > $THRESHOLD_MB" | bc -l) )); then
+if (( $(echo "$REDIS_MEMORY > $THRESHOLD_MB" | bc -l) == 1 )); then
     echo "$(date) - WARNING: Redis memory usage exceeded ${THRESHOLD_MB} MB!" >> $LOG_FILE
     
     
     redis-cli memory purge
     echo "$(date) - Executed MEMORY PURGE to free unused memory." >> $LOG_FILE
 
-    # Check memory again 
-    sleep 5  # Allow time 
+    # Check memory again
+    sleep 5  # Allow time
     FINAL_REDIS_MEMORY=$(redis-cli info memory | grep used_memory_rss_human | awk -F ':' '{print $2}' | tr -d '\r' | tr -d ' ' | sed 's/K/*0.001/g' | sed 's/M//g' | sed 's/G/*1024/g' | bc)
 
     # If memory is still above threshold, restart Redis
@@ -34,6 +34,6 @@ if (( $(echo "$REDIS_MEMORY > $THRESHOLD_MB" | bc -l) )); then
     fi
 
 # If memory is below threshold, log a normal status
-elif (( $(echo "$REDIS_MEMORY <= $THRESHOLD_MB" | bc -l) )); then
+else
     echo "$(date) - Memory OK: Redis memory is within limits." >> $LOG_FILE
 fi
