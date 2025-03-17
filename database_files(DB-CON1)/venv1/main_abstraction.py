@@ -109,6 +109,7 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
             query = f"SELECT * from {table_name} LIMIT {limit}"
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await postgres(query)
+            # check if the return is an error - we want to add null to the redis key
             redis_db_key = send_to_redis(result)
             store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}

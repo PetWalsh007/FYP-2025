@@ -23,15 +23,6 @@ import redis as rd
 
 logging.basicConfig(filename="dash_main.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
-redis_host ='192.168.1.83'
-redis_port = 6379
-
-try:
-    redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
-    redis_client.ping()
-    logging.info("Connected to Redis server successfully.")
-except rd.ConnectionError as e:
-    logging.error(f"Redis connection error: {e}")
 
 
 # Load the existing config
@@ -57,12 +48,43 @@ def load_config_call():
     config = load_config()
      
 load_config_call()
+
+
+
 # routes pathname added for testing 
 app = dash.Dash(__name__, requests_pathname_prefix='/dash/')
 app.title = 'RTA MES'
 server = app.server  # Expose the Flask server for Gunicorn
 
 
+
+def connect_redis():
+    
+    redis_host = config['endpoints']['redis']['ip']
+    redis_port = config['endpoints']['redis']['port']
+    global redis_client
+    try:
+        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+        redis_client.ping()
+        logging.info("Connected to Redis server successfully.")
+        
+    except rd.ConnectionError as e:
+        logging.error(f"Redis connection error: {e}")
+        redis_client = None
+        return None
+    
+
+connect_redis()  # Connect to Redis server at the start of the app
+if redis_client is None:
+    t=5
+    logging.error("Failed to connect to Redis server. Retrying...")
+    time.sleep(t)
+    connect_redis()  # Retry connecting to Redis server
+    if redis_client is None:
+        logging.error(f"Failed to connect to Redis server {config['endpoints']['redis']['ip']} after retrying....")
+        raise ConnectionError("Could not connect to Redis server. Exiting...")
+        
+    
 
 dev_style = {
     'textAlign': 'center',
@@ -131,26 +153,38 @@ def main_page_layout():
                                 ),
 
             html.Button('Process Data', id='process-data', n_clicks=0, className='button'),
-            html.Button('Get X Data', id='get-all-data-button', n_clicks=0, className='button'),
+            html.Button('Get Raw Data', id='get-all-data-button', n_clicks=0, className='button'),
             html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button'),
             html.Button("Download CSV", id="btn_csv"),
             html.Button("Config", id="config-button", n_clicks=0, className='button'),
             dcc.Download(id="download-dataframe-csv"),
         ], style=button_style),
         html.Div([
-            html.Label("Select Data Store:"),
+                    html.Label("Stored Redis Keys from this Session:"),
+                    html.Div(id="available-keys-container", style={'marginBottom': '10px'}),
+
+                    html.Label("Enter Redis Key to Retrieve Data:"),
+                    dcc.Input(id='redis-key-entry', type='text', placeholder="Enter Redis Key", style={'marginRight': '10px'}),
+                    
+                    html.Button("Retrieve Data from Redis", id="fetch-from-redis-button", n_clicks=0, className='button'),
+
+                    # Hidden store to keep track of Redis keys
+                    dcc.Store(id='redis-key-store', data=[]),
+                        ], style={'marginTop': '20px', 'textAlign': 'center'}),
+        # html.Div([
+        #     html.Label("Select Data Store:"),
             
-            dcc.RadioItems(
-                id="store-selector",
-                options=[
-                    {"label": html.Span("Store 1", id="store-1-label"), "value": "dataframe-store-1"},
-                    {"label": html.Span("Store 2", id="store-2-label"), "value": "dataframe-store-2"},
-                    {"label": html.Span("Store 3", id="store-3-label"), "value": "dataframe-store-3"},
-                ],
-                value="dataframe-store-1",
-                labelStyle={'display': 'inline-block', 'marginRight': '10px'}
-            ),
-        ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex', 'justifyContent': 'center'}),
+        #     dcc.RadioItems(
+        #         id="store-selector",
+        #         options=[
+        #             {"label": html.Span("Store 1", id="store-1-label"), "value": "dataframe-store-1"},
+        #             {"label": html.Span("Store 2", id="store-2-label"), "value": "dataframe-store-2"},
+        #             {"label": html.Span("Store 3", id="store-3-label"), "value": "dataframe-store-3"},
+        #         ],
+        #         value="dataframe-store-1",
+        #         labelStyle={'display': 'inline-block', 'marginRight': '10px'}
+        #     ),
+        # ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex', 'justifyContent': 'center'}),
 
         
         html.Div([
@@ -194,16 +228,13 @@ def main_page_layout():
                                         )
                 ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
-        dcc.Store(id='dataframe-store-1',  data={'collected_data_1':[]}),  # Store the first dataframe 
-        dcc.Store(id='dataframe-store-2',  data={'collected_data_2':[]}),  # Store the second dataframe
-        dcc.Store(id='dataframe-store-3',  data={'collected_data_3':[]}),  # Store the third dataframe
     ])
 
 
 page2_layout = html.Div([
     html.H1("Edit Config File"),
     
-    html.P("Warning: Editing the config file may cause the system to stop working. Only edit if you know what you are doing.", style={'color': 'red'}),
+    html.P("Warning: Editing the config file may cause the system to stop working. Ensure Backup has been taken", style={'color': 'red'}),
     
     dcc.Textarea(
         id='config-textarea',
@@ -369,16 +400,18 @@ def get_style(data):
      Output('data-table', 'columns'),  
      Output('data-table', 'data'),  
      Output('store', 'data'),  # Store data for visualization
+     Output('redis-key-store', 'data'),  # Store Redis keys
+     Output('available-keys-container', 'children'),  # Show Redis keys
      Output('url', 'pathname'),
      Output('download-dataframe-csv', 'data'),
      Output('x-axis-dropdown', 'options'),  # Populate X-axis dropdown
      Output('y-axis-dropdown', 'options')],  # Populate Y-axis dropdown (numeric)
     [Input('clear-screen-button', 'n_clicks'),
+     Input('get-all-data-button', 'n_clicks'),
+     Input('fetch-from-redis-button', 'n_clicks'),
      Input('data-date-range', 'start_date'),
      Input('data-date-range', 'end_date'),
      Input('process-data', 'n_clicks'),
-     Input('get-all-data-button', 'n_clicks'),
-     Input('store-selector', 'value'),
      Input('data-points', 'value'),
      Input('database', 'value'),
      Input('table_name', 'value'),
@@ -386,120 +419,124 @@ def get_style(data):
      Input("config-button", "n_clicks"),
      Input('url', 'pathname')],
     [State('store', 'data'),
-     State('dataframe-store-1', 'data'),
-     State('dataframe-store-2', 'data'),
-     State('dataframe-store-3', 'data')],
-    prevent_initial_call=True
+     State('redis-key-store', 'data'),
+     State('redis-key-entry', 'value')],
+     prevent_initial_call=True
 )
-def update_output(na_button,st_date , end_date , get_data_clicks, get_all_data_clicks, selected_store ,data_pt, db_sel, tbl_sel ,download_cts, config_button, pathname, store_data, data_store_1, data_store_2, data_store_3):
+def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, process_btn,
+                  data_pt, db_sel, tbl_sel, download_cts, config_button, pathname,
+                  store_data, redis_key_store, manual_key_entry):
 
-    """
-    This function is the main callback function for the main app page. It is used to update the main content containers.
-    """
+    # fix for none type issue
+    get_data_btn = int(get_data_btn or 0)
+    fetch_data_btn = int(fetch_data_btn or 0)
+    clear_btn = int(clear_btn or 0)
+    process_btn = int(process_btn or 0)
+    download_cts = int(download_cts or 0)
+    config_button = int(config_button or 0)
+
+    logging.info(f"Callback Triggered - Button ID: {dash.callback_context.triggered}")
+
     ctx = dash.callback_context
-
     if not ctx.triggered:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
     global dataframe
-    logging.info(f"Dataframe 1 has this data while going through script start ---- {data_store_1}")
-    
+
+    #  Clear screen 
+    if button_id == 'clear-screen-button':
+        logging.info("Clearing screen...")
+        store_data['get_data_clicks'] = 0
+        store_data['get_all_data_clicks'] = 0
+        return clear_screen(), [], [], store_data, [], '', dash.no_update, dash.no_update, [], []
+
+    #  Retrieve and Store redis key
+    if button_id == 'get-all-data-button' and get_data_btn > 0:
+        logging.info(f"Fetching Redis Key - Data Points: {data_pt}, DB: {db_sel}, Table: {tbl_sel}")
+        response_json = get_data_all(data_pt, db_sel, tbl_sel)  # Calls backend
+        redis_key = response_json.get("redis_key")
+
+        if redis_key:
+            if not redis_key_store:
+                redis_key_store = []
+            redis_key_store.append(redis_key)
+            return (
+                f"Data requested. Redis Key: {redis_key}",
+                [], [], store_data, redis_key_store,
+                html.Ul([html.Li(key) for key in redis_key_store]),
+                dash.no_update, dash.no_update, [], []
+            )
+
+        return "Failed to retrieve data.", [], [], store_data, redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update, [], []
+
+    # Updated to now only fetch the data from Redis when a user clicks the retrieve data from redis button 
+    if button_id == 'fetch-from-redis-button' :
+        # Fetch data from Redis while checking if the user has entered a valid key - or take the last key or if no keys let = none and skip
+        redis_key = manual_key_entry or (redis_key_store[-1] if redis_key_store else None)
+        if redis_key:
+            try:
+                redis_data = redis_client.get(redis_key)
+                if redis_data:
+                    redis_data = json.loads(redis_data)
+                    dataframe = pd.DataFrame(redis_data)
+                    column_options = [{"label": col, "value": col} for col in dataframe.columns]
+                    numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
+                    store_data['onscreen_data'] = dataframe.to_dict('records')
+                    return (
+                        f"Data retrieved for Redis Key: {redis_key}",
+                        [{"name": i, "id": i} for i in dataframe.columns],  # Table Columns
+                        dataframe.to_dict('records'),  # Table Data
+                        store_data,  # Store Data for visualization
+                        redis_key_store,
+                        html.Ul([html.Li(key) for key in redis_key_store]),
+                        dash.no_update, dash.no_update, column_options, numeric_columns
+                    )
+
+            except Exception as e:
+                logging.error(f"Redis Fetch Error: {e}")
+                return (
+                    f"Error retrieving data from Redis: {e}", [], [], store_data,
+                    redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]),
+                    dash.no_update, dash.no_update, [], []
+                ) 
+        
+
     # https://dash.plotly.com/dash-core-components/download
     # Generate CSV data from the current data on the screen
     if button_id == 'btn_csv':
-        
         filename1 = f"data_{time.strftime('%H%M%S')}_{random.randint(1,50)}.csv"
+        logging.info(f"Generating CSV file: {filename1}")
         data = store_data.get('onscreen_data', [{'col1': 'value1', 'col2': 'value2'}, {'col1': 'value3', 'col2': 'value4'}])
         csv_data = generate_csv_data(data)
-        return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False), dash.no_update, dash.no_update
+        return(
+                dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update,
+                dash.no_update, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False),
+                dash.no_update, dash.no_update
+        )
 
-    if button_id == 'clear-screen-button':
-        store_data['get_data_clicks'] = 0
-        store_data['get_all_data_clicks'] = 0
-        
-        return clear_screen(), [], [], store_data, dash.no_update, dash.no_update, [], []  # Clear the content of both output containers, reset click counts, and reset dropdowns
-
-    if button_id == 'process-data' and get_data_clicks > 0:
+    # Process Data for Analysis
+    if button_id == 'process-data' and process_btn > 0:
         store_data['get_data_clicks'] += 1  
-        
-       # data = get_data(store_data['get_data_clicks'], db_sel, tbl_sel)  
-
         data = send_data_for_processing(store_data['get_data_clicks'])
-        # log data 
-        #logging.info(f"Here -------- {data}")
         store_data['onscreen_data'] = data
         dataframe = pd.DataFrame(data)
-        #logging.info(f"Here dframe -------- {dataframe}")
-        # update data_store_1
-        # Save data to the selected store
-        if selected_store == "dataframe-store-1":
-            data_store_1["data"] = data
-        elif selected_store == "dataframe-store-2":
-            data_store_2 = {"data": data}
-        elif selected_store == "dataframe-store-3":
-            data_store_3 = {"data": data}
 
-    # here the defaults get printed on each switch - must check on the collected_data_1 atribute        
-
-    elif button_id == 'store-selector':
-        logging.info(f"Here in the store selector -----#######")
-        logging.info(f"Here in the store selector -----{selected_store}")
-        if selected_store == "dataframe-store-1":
-            logging.info(f"Here in the store selector -----{data_store_1}")
-            data = data_store_1.get("collected_data_1", [])
-        elif selected_store == "dataframe-store-2":
-            logging.info(f"Here in the store selector -----{data_store_2}")
-            data = data_store_2.get("collected_data_2", [])
-        elif selected_store == "dataframe-store-3":
-            logging.info(f"Here in the store selector -----{data_store_3}")
-            data = data_store_3.get("collected_data_3", [])
-        else:
-            data = []
-
-        dataframe = pd.DataFrame(data)
-        store_data['onscreen_data'] = dataframe.to_dict('records')
-
-
-    elif button_id == 'get-all-data-button' and get_all_data_clicks > 0:
-        store_data['onscreen_data'] = []
-        all_data = get_data_all(data_pt, db_sel, tbl_sel)  
-        store_data['get_data_clicks'] = 0  
-        dataframe = pd.DataFrame(all_data)
-        logging.info(f"Here dframe  all -------- {dataframe}")
-        store_data['onscreen_data'] = dataframe.to_dict('records')
-        if selected_store == "dataframe-store-1":
-            data_store_1['collected_data_1'] = dataframe.to_dict('records')
-            logging.info(f"Here dframe  all 1-------- {data_store_1}")
-            logging.info(f'the data type of data_store_1 is {type(data_store_1)}')
-        elif selected_store == "dataframe-store-2":
-            data_store_2['collected_data_2'] = dataframe.to_dict('records')
-            logging.info(f"Here dframe  all 2-------- {data_store_2}")
-            logging.info(f'the data type of data_store_2 is {type(data_store_2)}')
-        elif selected_store == "dataframe-store-3":
-            data_store_3['collected_data_3'] = dataframe.to_dict('records')
-            logging.info(f"Here dframe  all 3-------- {data_store_3}")
-            logging.info(f'the data type of data_store_3 is {type(data_store_3)}')
-        else:
-            pass
-
-    elif button_id == 'config-button':
-        return dash.no_update, dash.no_update, dash.no_update, store_data, '/dash/page2', dash.no_update, dash.no_update, dash.no_update 
-
-    else:
-        #return dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-        pass
-
+    # Config Page
+    if button_id == 'config-button':
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, store_data, redis_key_store, '/dash/page2', dash.no_update, dash.no_update, dash.no_update
+    
+    # Update Graph menu
     column_options = [{"label": col, "value": col} for col in dataframe.columns]
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
-
 
     return (
         html.Div([f"Data retrieved for {tbl_sel} in {db_sel}."]),
         [{"name": i, "id": i} for i in dataframe.columns],  # Table Columns
         store_data["onscreen_data"],  # Table Data
         store_data,  # Store Data for visualization
+        redis_key_store,
+        html.Ul([html.Li(key) for key in redis_key_store]),
         dash.no_update,
         dash.no_update,
         column_options,  # Populate X-axis dropdown
@@ -614,14 +651,7 @@ def get_data_all(pts, db_sel, tbl_sel):
             return [{"Error": "Error in getting data"}]
         return response.json()
     else:
-        # response is the key to get data from redis
-        redis_key = response_json.get("redis_key")
-        logging.info(f"Redis key: {redis_key}")
-        # get data from redis
-        redis_data = redis_client.get(redis_key)
-        # format data which was sent to redis as result = result.to_dict(orient='records')
-        redis_data = json.loads(redis_data)
-        return redis_data
+        return response_json
 
 
 def send_data_for_processing(*args, **kwargs):
