@@ -131,8 +131,9 @@ text_style2 = {
 app.layout = html.Div([
     html.A(html.Button("Go to Home Page"), href="/", target="_self"), #_self used to trigger full page reload 
     dcc.Location(id='url', refresh=False),
-    html.Div(id='page-content')
-   
+    html.Div(id='page-content'),
+   html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
+    dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
 ], style={'fontFamily': 'Times New Roman', 'padding': '40px'})
 
 
@@ -152,13 +153,32 @@ def main_page_layout():
         html.Div(className='row', children='Real-Time Adaptive Data Analytics and Visualisation Platform for Industrial Manufacturing Execution Systems',
                 style=dev_style),
         html.Div([
+            html.Label('Select the database to query:', style={'fontSize': '18px', 'marginRight': '10px'}),
+            dcc.Dropdown(
+                id='database',
+                options=config.get("database_options", []),
+                value='postgres',
+                style={'fontSize': '18px', 'width': '170px', 'marginRight': '10px'}
+            ),
+            dcc.Dropdown(
+                id="table_name",
+                options=[
+                    {"label": f"{db_name.upper()} - {table}", "value": table}
+                    for db_name, db_info in config["databases"].items()
+                    for table in db_info["database"].get("tables", [])
+                ],
+                value=None,
+                placeholder="Select a Table",
+                style={'fontSize': '18px', 'width': '250px', 'marginRight': '10px'}
+            ),
             dcc.DatePickerRange(
                 id='data-date-range',
                 display_format='DD/MM/YYYY',
                 initial_visible_month=date.today(),
-                style={'marginBottom': '10px', 'fontSize': '16px'}
+                style={'fontSize': '16px', 'marginRight': '10px'}
             ),
-
+                    ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center', 'gap': '10px'}),
+            html.Div([
             html.Button('Process Data', id='process-data', n_clicks=0, className='button', style=button_style2),
             html.Button('Get Raw Data', id='get-all-data-button', n_clicks=0, className='button', style=button_style2),
             html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button', style=button_style2),
@@ -167,18 +187,41 @@ def main_page_layout():
 
             dcc.Download(id="download-dataframe-csv"),
         ], style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop': '20px', 'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'center', 'gap': '10px'}),
+
+        # https://dash.plotly.com/dash-html-components 
+        # https://www.w3.org/TR/css-grid-3/
+        # https://www.w3schools.com/css/css_grid.asp
+        # https://community.plotly.com/t/using-css-grid-with-dash/29018
+        # 
+
         html.Div([
-            html.Label("Stored Redis Keys from this Session:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
-            html.Div(id="available-keys-container", style={'marginBottom': '10px', 'textAlign': 'center'}),
+           html.Div([html.Label("Stored Redis Keys from this Session:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
+                     html.Div(id="available-keys-container", style={'marginBottom': '10px', 'textAlign': 'center', 'display': 'grid', 'gap': '10px'}),
 
-            html.Label("Enter Redis Key to Retrieve Data:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
-            dcc.Input(id='redis-key-entry', type='text', placeholder="Enter Redis Key", style={'marginRight': '10px', 'fontSize': '16px', 'padding': '5px'}),
 
-            html.Button("Retrieve Data from Redis", id="fetch-from-redis-button", n_clicks=0, className='button', style=button_style),
+                    html.Label("Enter Redis Key to Retrieve Data:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
+                    dcc.Input(id='redis-key-entry', type='text', placeholder="Enter Redis Key", style={'marginRight': '10px', 'fontSize': '16px', 'padding': '5px'}),
 
-            # Hidden store to keep track of Redis keys
-            dcc.Store(id='redis-key-store', data=[]),
-        ], style={'marginTop': '20px', 'textAlign': 'left', 'padding': '20px', 'border': '1px solid #ccc', 'borderRadius': '5px', 'backgroundColor': '#f9f9f9'}),
+                    html.Button("Retrieve Data from Redis", id="fetch-from-redis-button", n_clicks=0, className='button', style=button_style),
+
+                    # Hidden store to keep track of Redis keys
+                    dcc.Store(id='redis-key-store', data=[]),
+                    ],style={'flex': '1', 'marginTop': '20px', 'textAlign': 'left', 'padding': '20px', 'border': '1px solid #ccc', 'borderRadius': '5px', 'backgroundColor': '#ededed  '}),
+
+            html.Div([
+                    html.Label("Stored Processed Data Keys from this Session:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
+                    html.Div(id="available-processed-keys-container", style={'marginBottom': '10px', 'textAlign': 'center'}),
+
+                    html.Label("Enter Processed Data Key to Retrieve Data:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
+                    dcc.Input(id='processed-key-entry', type='text', placeholder="Enter Processed Data Key", style={'marginRight': '10px', 'fontSize': '16px', 'padding': '5px'}),
+
+                    html.Button("Retrieve Processed Data from Redis", id="fetch-processed-from-redis-button", n_clicks=0, className='button', style=button_style),
+
+                    # Hidden store to keep track of Processed Data Redis keys
+                    dcc.Store(id='processed-key-store', data=[]),
+                    ], style={'flex': '1', 'marginTop': '20px', 'textAlign': 'left', 'padding': '20px', 'border': '1px solid #ccc', 'borderRadius': '5px', 'backgroundColor': '#ededed '}),
+
+                ], style={'display': 'flex', 'gap': '20px'}),
         # html.Div([
         #     html.Label("Select Data Store:"),
             
@@ -195,23 +238,7 @@ def main_page_layout():
         # ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex', 'justifyContent': 'center'}),
 
         
-        html.Div([
-            html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
-            dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
-            html.Label('Select the database to query:', style={'fontSize': '18px', 'marginRight': '10px', 'marginLeft': '15px'}),
-            dcc.Dropdown(id='database', options=config.get("database_options", []), value='postgres', style={'fontSize': '18px', 'width': '170px'}),
-            dcc.Dropdown(
-                        id="table_name",
-                        options= [
-                                    {"label": f"{db_name.upper()} - {table}", "value": table}
-                                    for db_name, db_info in config["databases"].items()
-                                        for table in db_info["database"].get("tables", [])
-                                ],  # Dynamically loads all tables from the config file
-                        value=None,
-                        placeholder="Select a Table",
-                        style={'fontSize': '18px', 'width': '250px'}
-    ),
-        ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex','justifyContent': 'center'}),
+
         html.Div(id='output-container', style=text_style2),
 
         html.Div([
