@@ -129,10 +129,14 @@ text_style2 = {
 
 # Define the layout of the Dash app 
 app.layout = html.Div([
-    html.A(html.Button("Go to Home Page"), href="/", target="_self"), #_self used to trigger full page reload 
+    html.A(html.Button("Go to Home Page", className='Button', style=button_style2), href="/", target="_self"),
+    html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button', style=button_style2),
+    html.Button("Download CSV", id="btn_csv", className='button', style=button_style2),
+    html.Button("Config", id="config-button", n_clicks=0, className='button', style={**button_style2, 'marginRight': '0px'}),
+    dcc.Download(id="download-dataframe-csv"),  # _self used to trigger full page reload 
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content'),
-   html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
+    html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
     dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
 ], style={'fontFamily': 'Times New Roman', 'padding': '40px'})
 
@@ -177,15 +181,19 @@ def main_page_layout():
                 initial_visible_month=date.today(),
                 style={'fontSize': '16px', 'marginRight': '10px'}
             ),
+             html.Button('Get Raw Data', id='get-all-data-button', n_clicks=0, className='button', style=button_style2),
                     ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center', 'gap': '10px'}),
             html.Div([
+            
+            dcc.Dropdown(
+                id='analysis-type',
+                options=config.get("analytics", []),
+                placeholder="Select Analysis Type",
+                style={'fontSize': '12px', 'width': '200px', 'marginRight': '10px'}
+            ),
             html.Button('Process Data', id='process-data', n_clicks=0, className='button', style=button_style2),
-            html.Button('Get Raw Data', id='get-all-data-button', n_clicks=0, className='button', style=button_style2),
-            html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button', style=button_style2),
-            html.Button("Download CSV", id="btn_csv", className='button', style=button_style2),
-            html.Button("Config", id="config-button", n_clicks=0, className='button', style={**button_style2, 'marginRight': '0px'}),
+           
 
-            dcc.Download(id="download-dataframe-csv"),
         ], style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop': '20px', 'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'center', 'gap': '10px'}),
 
         # https://dash.plotly.com/dash-html-components 
@@ -259,7 +267,7 @@ def main_page_layout():
                                         data=[],  # defualt empty data
                                         filter_action="native",
                                         sort_action="native",
-                                        page_size=200   
+                                        page_size=50  
                                         )
                 ], style={'marginTop': '20px'}),
         dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
@@ -488,8 +496,8 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
 
     #  Retrieve and Store redis key
     if button_id == 'get-all-data-button' and get_data_btn > 0:
-        logging.info(f"Fetching Redis Key - Data Points: {data_pt}, DB: {db_sel}, Table: {tbl_sel}")
-        response_json = get_data_all(data_pt, db_sel, tbl_sel)  # Calls backend
+        logging.info(f"Fetching Redis Key - Data Points: {data_pt}, DB: {db_sel}, Table: {tbl_sel}, Start Date: {st_date}, End Date: {end_date}")
+        response_json = get_data_all(data_pt, db_sel, tbl_sel, st_date, end_date)  # Calls backend
         redis_key = response_json.get("redis_key")
 
         if redis_key:
@@ -515,7 +523,8 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
                     redis_data = json.loads(redis_data)
                     dataframe = pd.DataFrame(redis_data)
                     column_options = [{"label": col, "value": col} for col in dataframe.columns]
-                    numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
+                    # update to ensure that columns that are not numeric are not shown in the y axis dropdown but string types that contian only numeric (steps) are allowed to be plotted
+                    numeric_columns = [{"label": col, "value": col} for col in dataframe.columns if pd.to_numeric(dataframe[col], errors='coerce').notnull().all()]
                     store_data['onscreen_data'] = dataframe.to_dict('records')
                     return (
                         f"Data retrieved for Redis Key: {redis_key}",
@@ -570,7 +579,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
         store_data["onscreen_data"],  # Table Data
         store_data,  # Store Data for visualization
         redis_key_store,
-        html.Ul([html.Li(key) for key in redis_key_store]),
+        dash.no_update,  # Redis keys
         dash.no_update,
         dash.no_update,
         column_options,  # Populate X-axis dropdown
@@ -661,7 +670,7 @@ def get_data(n_clicks):
     
     return response
 
-def get_data_all(pts, db_sel, tbl_sel):
+def get_data_all(pts, db_sel, tbl_sel, st_date, end_date):
     
     #using config file to get the table name
   
@@ -669,7 +678,7 @@ def get_data_all(pts, db_sel, tbl_sel):
     endpoint_ip = config['endpoints']['abstraction']['ip']
     endpoint_port = config['endpoints']['abstraction']['port']
     
-    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}') # updated to take the table name from the dropdown
+    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}&start={st_date}&end={end_date}') # updated to take the table name from the dropdown
     response_json = response.json()
     # send response to redis first 
     logging.info(f"Response Rec: {response_json}")

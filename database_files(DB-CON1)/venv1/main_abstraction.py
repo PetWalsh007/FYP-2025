@@ -90,11 +90,26 @@ def json_serial(obj):
 
 
 @app.get("/data")
-async def get_data(database: str ="null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10):
+async def get_data(database: str = "null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10, start: str = None, end: str = None):
     # Check if the database is SQL Server
+    # log all the inputs to the function
+    logging.info(f"Received request for /data with database: {database}, table_name: {table_name}, fil_condition: {fil_condition}, limit: {limit}, start: {start}, end: {end}")
+    if start is None or end is None:
+        logging.error("No start or end date provided")
+        return {"error": "No start or end date provided"}
+    try:
+        start_date = datetime.strptime(start, '%Y-%m-%d').strftime('%Y-%m-%d')
+        end_date = datetime.strptime(end, '%Y-%m-%d').strftime('%Y-%m-%d')
+        logging.info(f"Parsed start date: {start_date}, end date: {end_date}")
+    except ValueError as e:
+        logging.error(f"Date format error: {e}")
+        return {"error": "Invalid date format"}
     if database == 'sql_server':
         if table_name:
-            query = f"SELECT TOP {limit} * from {table_name} WHERE {fil_condition}"
+            date_filter = ""
+            if start and end:
+                date_filter = f" time BETWEEN '{start_date}' AND '{end_date}'"
+            query = f"SELECT * from {table_name} WHERE {date_filter}"
             logging.info(f"Executing SQL Server query: {query}")
             result = await sql_server(query)
             redis_db_key = send_to_redis(result)
@@ -106,10 +121,12 @@ async def get_data(database: str ="null", table_name: str = "null", fil_conditio
     # Check if the database is PostgreSQL
     elif database == 'postgres':
         if table_name:
-            query = f"SELECT * from {table_name} LIMIT {limit}"
+            date_filter = ""
+            if start and end:
+                date_filter = f" AND date_column BETWEEN '{start}' AND '{end}'"
+            query = f"SELECT * from {table_name} WHERE {fil_condition}{date_filter}"
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await postgres(query)
-            # check if the return is an error - we want to add null to the redis key
             redis_db_key = send_to_redis(result)
             store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}
