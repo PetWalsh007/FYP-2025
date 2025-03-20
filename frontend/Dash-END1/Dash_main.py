@@ -550,6 +550,10 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
     if button_id == 'btn_csv':
         filename1 = f"data_{time.strftime('%H%M%S')}_{random.randint(1,50)}.csv"
         logging.info(f"Generating CSV file: {filename1}")
+        # check if the store data is empty
+        if not store_data or "onscreen_data" not in store_data or not store_data["onscreen_data"]:
+            return dash.no_update, dash.no_update, dash.no_update, store_data, redis_key_store, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
         data = store_data.get('onscreen_data', [{'col1': 'value1', 'col2': 'value2'}, {'col1': 'value3', 'col2': 'value4'}])
         csv_data = generate_csv_data(data)
         return(

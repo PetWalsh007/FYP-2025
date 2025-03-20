@@ -15,6 +15,7 @@ from typing import Dict, Any
 
 import Custom_Fuzzy as fuzzy
 import Custom_DTW as dtw
+import step_analysis as step
 
 
 
@@ -56,40 +57,52 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/rec_req")
-async def rec_req(operation: str = "op", data: Dict[str, Any]=None):
+async def rec_req(operation: str = "op", data: Dict[str, Any]=None, redis_key: str = None):
     """
-    Function to dynamically process different types of incoming Pandas-like data.
-    operation param is sent along with the data to indicate the type of processing required.
+    Function to dynamically process different types of incoming data from the redis store.
+    Operation param is sent along with the data to indicate the type of processing required.
     """
-    try:
-        if not isinstance(data, dict) or "values" not in data:
-            raise HTTPException(status_code=400, detail="Invalid request format")
+    # try:
+    #     if not isinstance(data, dict) or "values" not in data:
+    #         raise HTTPException(status_code=400, detail="Invalid request format")
 
-        # Convert data to Pandas DataFrame
-        df = pd.DataFrame(data["values"])
-        #logging.info(df)
-        #logging.info(data)
-        # Get the requested operation
+    #     # Convert data to Pandas DataFrame
+    #     df = pd.DataFrame(data["values"])
+    #     #logging.info(df)
+    #     #logging.info(data)
+    #     # Get the requested operation
         
 
-        # Perform dynamic calculations based on operation
-        if operation == "stats":  # Summary statistics
-            # get average of each column where data is int or float
-            result = df.select_dtypes(include=[np.number]).mean()
-            logging.info(f'testest --- {result}')
-            result = result.to_dict()
+    #     # Perform dynamic calculations based on operation
+    #     if operation == "stats":  # Summary statistics
+    #         # get average of each column where data is int or float
+    #         result = df.select_dtypes(include=[np.number]).mean()
+    #         logging.info(f'testest --- {result}')
+    #         result = result.to_dict()
 
 
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported operation")
+    #     else:
+    #         raise HTTPException(status_code=400, detail="Unsupported operation")
 
-        #logging.info(result)
-        result = format_response(result)  # Apply formatting here
-        #logging.info(result)
-        return {"processed": result}
+    #     #logging.info(result)
+    #     result = format_response(result)  # Apply formatting here
+    #     #logging.info(result)
+    #     return {"processed": result}
+
+    # except Exception as e:
+    #     raise HTTPException(status_code=400, detail=str(e))
+
+
+    try:
+        # get redis data via the key
+        redis_data = redis_client.get(redis_key)
+        if redis_data is None:
+            raise HTTPException(status_code=404, detail="Redis key not found")
+        # Convert the redis data to a di
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logging.error(f"Error retrieving data from Redis: {str(e)}")
+        return {"error": "Failed to retrieve data from Redis"}
 
 
 def format_response(result: Dict[str, Any]) -> list:
@@ -118,3 +131,33 @@ def configure_data()-> None:
 
 
     pass
+
+
+
+
+def step_analysis_func():
+    """
+    Function to process the PLC step analysis requests
+    """
+
+
+    pass 
+
+
+
+def fuzzy_func():
+    """
+    Function to process the fuzzy logic requests
+    """
+
+    pass
+
+
+def dtw_func():
+    """
+    Function to process the DTW requests
+    """
+
+    pass
+
+

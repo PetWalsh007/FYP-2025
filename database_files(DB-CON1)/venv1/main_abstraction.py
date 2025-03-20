@@ -32,6 +32,7 @@ async def lifespan(app):
     global postgres_con 
     global redis_client
     global postgres_server_con
+    logging.info("***********************************")
     logging.info("Starting FastAPI lifespan function...")
     sqls_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
     
@@ -77,6 +78,7 @@ async def lifespan(app):
     
 
     logging.info("Database connections closed.")
+    logging.info("***********************************")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -166,12 +168,14 @@ def store_query_data(key, qry, query_table, query_db):
             return {"error": "SQL Server connection not established"}
     
     table = "redis_data.redis_cache_log"
-    query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table) VALUES ('{key}', '{qry}', '{query_db}', '{query_table}')"
-    logging.info(f"Executing Postgres Server query: {query}")
-    # execute and commit the query
+    query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table) VALUES (?, ?, ?, ?)"
+       
+    values = (key, qry, query_db, query_table)
 
+    logging.info(f"Executing Postgres Server query: {query} with values {values}")
+    # execute and commit the query
     try:
-        postgres_server_con.cursor.execute(query)
+        postgres_server_con.cursor.execute(query, values)
         postgres_server_con.conn.commit()
         logging.info(f"Query executed successfully: {query}")
     except Exception as e:
@@ -220,7 +224,7 @@ def send_to_redis(redis_value):
     logging.info(f"Storing result in Redis with random key")
     rand_number = random.randint(1, 1000)
     # add 5 random alpha chars to the rand_number to make it unique
-    redis_key = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=5))
+    redis_key = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=6))
     logging.info(f"Generated random key: {redis_key}")
     try:
         redis_client.set(redis_key, json.dumps(redis_value, default=json_serial), ex=3600)  # Set TTL to 1 hour
