@@ -184,7 +184,7 @@ def main_page_layout():
              html.Button('Get Raw Data', id='get-all-data-button', n_clicks=0, className='button', style=button_style2),
                     ], style={'textAlign': 'center', 'marginBottom': '20px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center', 'gap': '10px'}),
             html.Div([
-            
+            dcc.Input(id='redis-key-for-proc', type='text', placeholder="Enter Raw Data Key", style={'marginRight': '10px', 'fontSize': '16px', 'padding': '5px'}),
             dcc.Dropdown(
                 id='analysis-type',
                 options=config.get("analytics", []),
@@ -437,7 +437,6 @@ def get_style(data):
 
 
 # Serves as the callback function for the Dash app to update the content of the output containers
-
 @app.callback(
     [Output('output-container', 'children'),
      Output('data-table', 'columns'),  
@@ -445,6 +444,8 @@ def get_style(data):
      Output('store', 'data'),  # Store data for visualization
      Output('redis-key-store', 'data'),  # Store Redis keys
      Output('available-keys-container', 'children'),  # Show Redis keys
+     Output('processed-key-store', 'data'),  # Store Processed Data keys
+     Output('available-processed-keys-container', 'children'),  # Show Processed Data keys
      Output('url', 'pathname'),
      Output('download-dataframe-csv', 'data'),
      Output('x-axis-dropdown', 'options'),  # Populate X-axis dropdown
@@ -452,6 +453,7 @@ def get_style(data):
     [Input('clear-screen-button', 'n_clicks'),
      Input('get-all-data-button', 'n_clicks'),
      Input('fetch-from-redis-button', 'n_clicks'),
+     Input('fetch-processed-from-redis-button', 'n_clicks'),
      Input('data-date-range', 'start_date'),
      Input('data-date-range', 'end_date'),
      Input('process-data', 'n_clicks'),
@@ -463,12 +465,15 @@ def get_style(data):
      Input('url', 'pathname')],
     [State('store', 'data'),
      State('redis-key-store', 'data'),
-     State('redis-key-entry', 'value')],
-     prevent_initial_call=True
+     State('redis-key-entry', 'value'),
+     State('processed-key-store', 'data'),
+     State('processed-key-entry', 'value'),
+     State('redis-key-for-proc', 'value')],
+    prevent_initial_call=True
 )
-def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, process_btn,
+def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_btn, st_date, end_date, process_btn,
                   data_pt, db_sel, tbl_sel, download_cts, config_button, pathname,
-                  store_data, redis_key_store, manual_key_entry):
+                  store_data, redis_key_store, manual_key_entry, processed_key_store, manual_processed_key_entry, to_process_key):
 
     # fix for none type issue
     get_data_btn = int(get_data_btn or 0)
@@ -477,12 +482,16 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
     process_btn = int(process_btn or 0)
     download_cts = int(download_cts or 0)
     config_button = int(config_button or 0)
+    fetch_processed_data_btn = int(fetch_processed_data_btn or 0)
 
     logging.info(f"Callback Triggered - Button ID: {dash.callback_context.triggered}")
 
     ctx = dash.callback_context
     if not ctx.triggered:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return (dash.no_update, dash.no_update, 
+                dash.no_update, dash.no_update, 
+                dash.no_update, dash.no_update, dash.no_update, dash.no_update, # redis keys update
+                dash.no_update, dash.no_update, dash.no_update, dash.no_update)
 
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     global dataframe
@@ -492,7 +501,14 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
         logging.info("Clearing screen...")
         store_data['get_data_clicks'] = 0
         store_data['get_all_data_clicks'] = 0
-        return clear_screen(), [], [], store_data, [], '', dash.no_update, dash.no_update, [], []
+        return (
+            clear_screen(), [], [], {'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data': []},  # Reset store data
+            [],  # Clear Redis key store
+            [],  # Clear available keys container
+            [],  # Clear processed key store
+            [],  # Clear available processed keys container
+            dash.no_update, dash.no_update,  [],  [] 
+        )
 
     #  Retrieve and Store redis key
     if button_id == 'get-all-data-button' and get_data_btn > 0:
@@ -504,14 +520,15 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
             if not redis_key_store:
                 redis_key_store = []
             redis_key_store.append(redis_key)
-            return (
-                f"Data requested. Redis Key: {redis_key}",
-                [], [], store_data, redis_key_store,
-                html.Ul([html.Li(key) for key in redis_key_store]),
+            return(
+                f"Data requested. Redis Key: {redis_key}",[], [], store_data, 
+                redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
                 dash.no_update, dash.no_update, [], []
             )
 
-        return "Failed to retrieve data.", [], [], store_data, redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update, [], []
+        return ("Failed to retrieve data.", [], [], store_data, 
+                redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
+                dash.no_update, dash.no_update, [], [])
 
     # Updated to now only fetch the data from Redis when a user clicks the retrieve data from redis button 
     if button_id == 'fetch-from-redis-button' :
@@ -527,23 +544,48 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
                     numeric_columns = [{"label": col, "value": col} for col in dataframe.columns if pd.to_numeric(dataframe[col], errors='coerce').notnull().all()]
                     store_data['onscreen_data'] = dataframe.to_dict('records')
                     return (
-                        f"Data retrieved for Redis Key: {redis_key}",
-                        [{"name": i, "id": i} for i in dataframe.columns],  # Table Columns
-                        dataframe.to_dict('records'),  # Table Data
-                        store_data,  # Store Data for visualization
-                        redis_key_store,
-                        html.Ul([html.Li(key) for key in redis_key_store]),
+                        f"Data retrieved for Redis Key: {redis_key}", [{"name": i, "id": i} for i in dataframe.columns],  dataframe.to_dict('records'), store_data,  # Store Data for visualization
+                        redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
                         dash.no_update, dash.no_update, column_options, numeric_columns
                     )
 
             except Exception as e:
-                logging.error(f"Redis Fetch Error: {e}")
+                logging.error(f"Redis Raw Data Fetch Error: {e}")
                 return (
                     f"Error retrieving data from Redis: {e}", [], [], store_data,
-                    redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]),
+                    redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
                     dash.no_update, dash.no_update, [], []
                 ) 
-        
+
+    # Used to fetch the processed data from redis using a key - same conecpt as above
+    if button_id == 'fetch-processed-from-redis-button':
+        redis_key = manual_processed_key_entry or (processed_key_store[-1] if processed_key_store else None)
+        if redis_key:
+            try:
+                redis_data = redis_client.get(redis_key)
+                if redis_data:
+                    redis_data = json.loads(redis_data)
+                    dataframe = pd.DataFrame(redis_data)
+                    column_options = [{"label": col, "value": col} for col in dataframe.columns]
+                    # update to ensure that columns that are not numeric are not shown in the y axis dropdown but string types that contian only numeric (steps) are allowed to be plotted
+                    numeric_columns = [{"label": col, "value": col} for col in dataframe.columns if pd.to_numeric(dataframe[col], errors='coerce').notnull().all()]
+                    store_data['onscreen_data'] = dataframe.to_dict('records')
+                    return (
+                        f"Data retrieved for Redis Key: {redis_key}",
+                        [{"name": i, "id": i} for i in dataframe.columns],  dataframe.to_dict('records'),  store_data,  # Store Data for visualization
+                        redis_key_store, dash.no_update, processed_key_store, dash.no_update,
+                        dash.no_update, dash.no_update, column_options, numeric_columns
+                    )
+
+            except Exception as e:
+                logging.error(f"Redis Process Data Fetch Error: {e}")
+                return (
+                    f"Error retrieving data from Redis: {e}", [], [], store_data,
+                    redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, html.Ul([html.Li(key) for key in processed_key_store]), 
+                    dash.no_update, dash.no_update, [], []
+                )
+        pass 
+
 
     # https://dash.plotly.com/dash-core-components/download
     # Generate CSV data from the current data on the screen
@@ -557,22 +599,29 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
         data = store_data.get('onscreen_data', [{'col1': 'value1', 'col2': 'value2'}, {'col1': 'value3', 'col2': 'value4'}])
         csv_data = generate_csv_data(data)
         return(
-                dash.no_update, dash.no_update, dash.no_update, store_data, dash.no_update,
-                dash.no_update, dash.no_update, dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False),
+                dash.no_update, dash.no_update, dash.no_update, store_data, 
+                dash.no_update, dash.no_update, dash.no_update, dash.no_update,
+                dash.no_update, 
+                dcc.send_data_frame(csv_data.to_csv, filename=filename1, index=False),
                 dash.no_update, dash.no_update
         )
 
     # Process Data for Analysis
     if button_id == 'process-data' and process_btn > 0:
         store_data['get_data_clicks'] += 1  
-        data = send_data_for_processing(store_data['get_data_clicks'])
-        store_data['onscreen_data'] = data
-        dataframe = pd.DataFrame(data)
+        try:
+            data = send_data_for_processing(to_process_key)
+            store_data['onscreen_data'] = data
+            dataframe = pd.DataFrame(data)
+        except Exception as e:
+            logging.error(f"Error processing data: {e}")
+
 
     # Config Page
     if button_id == 'config-button':
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, store_data, redis_key_store, '/dash/page2', dash.no_update, dash.no_update, dash.no_update
-    
+        return (dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, 
+                dash.no_update, dash.no_update, dash.no_update, 
+                '/dash/page2', dash.no_update, dash.no_update, dash.no_update)
     # Update Graph menu
     column_options = [{"label": col, "value": col} for col in dataframe.columns]
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
@@ -584,6 +633,8 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, st_date, end_date, pr
         store_data,  # Store Data for visualization
         redis_key_store,
         dash.no_update,  # Redis keys
+        dash.no_update,  # Processed keys
+        dash.no_update,  # Processed keys container
         dash.no_update,
         dash.no_update,
         column_options,  # Populate X-axis dropdown
@@ -641,7 +692,7 @@ def generate_csv_data(data_to_download) -> pd.DataFrame:
 
    
 # Old Function previously used to get increments of data from the database - Now button calls send_data_for_processing
-def get_data(n_clicks):
+def get_data(n_clicks, redis_key_proc):
     # This function will send a request to the FastAPI server to get data from the database
    
     # use the config file to get the table name and database name
@@ -658,7 +709,7 @@ def get_data(n_clicks):
     }
 
 
-    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats' 
+    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats&redis_key={redis_key_proc}'  
 
     response = requests.post(url, json=data)
    
@@ -666,7 +717,7 @@ def get_data(n_clicks):
         return [{"Error": "Error in getting data"}]
     response = response.json()
 
-    logging.info(response)
+    
     # flatten processed in the response
     response = response['processed']
 
@@ -701,7 +752,7 @@ def get_data_all(pts, db_sel, tbl_sel, st_date, end_date):
         return response_json
 
 
-def send_data_for_processing(*args, **kwargs):
+def send_data_for_processing(redis_key_proc):
     # This function will send data to the appropriate LxCT for processing
 
     endpoint_ip = config['endpoints']['backend']['ip']
@@ -714,7 +765,7 @@ def send_data_for_processing(*args, **kwargs):
         {"sensor": "C", "reading": 30}
     ]}
     
-    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats' 
+    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats&redis_key={redis_key_proc}'  # updated to take the table name from the dropdown
 
     response = requests.post(url, json=data)
     
@@ -722,7 +773,7 @@ def send_data_for_processing(*args, **kwargs):
         return [{"Error": "Error in getting data"}]
     response = response.json()
 
-    logging.info(f"Response Rec: {response}")
+    
     # flatten processed in the response
     response = response['processed']
 
