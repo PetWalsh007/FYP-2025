@@ -258,3 +258,18 @@ def open_server_db_con():
         postgres_con2 = None
         return postgres_con2
     
+
+
+
+@app.get("/config")
+def get_config(service_config: str = "null"):
+    # This will return the config file for the service requested
+    config = None
+    # send predefined request for latest config file
+    get_config_data(service_config)
+
+
+
+def get_config_data(file_name):
+   
+   pass 
