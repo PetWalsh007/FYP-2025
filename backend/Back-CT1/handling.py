@@ -10,12 +10,15 @@ import numpy as np
 from contextlib import asynccontextmanager
 import logging
 import redis as rd
+import json
 
 from typing import Dict, Any
 
 import Custom_Fuzzy as fuzzy
 import Custom_DTW as dtw
 import step_analysis as step
+
+import processing
 
 
 
@@ -57,80 +60,73 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/rec_req")
-async def rec_req(operation: str = "op", data: Dict[str, Any]=None, redis_key: str = None):
+async def rec_req(redis_key: str = None):
     """
     Function to dynamically process different types of incoming data from the redis store.
     Operation param is sent along with the data to indicate the type of processing required.
     """
-    # try:
-    #     if not isinstance(data, dict) or "values" not in data:
-    #         raise HTTPException(status_code=400, detail="Invalid request format")
+    try:
+        data_send = get_redis_data(redis_key)
+        if "error" in data_send:
+            return {"error": data_send["error"]}
 
-    #     # Convert data to Pandas DataFrame
-    #     df = pd.DataFrame(data["values"])
-    #     #logging.info(df)
-    #     #logging.info(data)
-    #     # Get the requested operation
-        
+        return data_send
 
-    #     # Perform dynamic calculations based on operation
-    #     if operation == "stats":  # Summary statistics
-    #         # get average of each column where data is int or float
-    #         result = df.select_dtypes(include=[np.number]).mean()
-    #         logging.info(f'testest --- {result}')
-    #         result = result.to_dict()
+    except Exception as e:
+        logging.error(f"Error processing request: {str(e)}")
+        return {"error": "Failed to process request"}
+    
 
 
-    #     else:
-    #         raise HTTPException(status_code=400, detail="Unsupported operation")
 
-    #     #logging.info(result)
-    #     result = format_response(result)  # Apply formatting here
-    #     #logging.info(result)
-    #     return {"processed": result}
+# process the data 
+@app.post("/process_data")
+def process_data(redis_key: str = None):
+    """
+    Function to process the data that has been passed in the request
+    """
 
-    # except Exception as e:
-    #     raise HTTPException(status_code=400, detail=str(e))
+    op_data = get_redis_data(redis_key)
+    if "error" in op_data:
+        return {"error": op_data["error"]}
 
+
+
+    # begin processing the data
+    data_to_process = json.loads(op_data)
+    processing.configure_data(op_data)
+
+
+    pass
+
+
+
+def get_redis_data(redis_key):
+    """
+    Function to get the data from the redis store
+    """
 
     try:
         # get redis data via the key
-        redis_data = redis_client.get(redis_key)
+        if redis_client.exists(redis_key):
+            logging.info(f"Redis key {redis_key} exists")
+            redis_data = redis_client.get(redis_key)
+
+        
+
+        else:
+            logging.info(f"Redis key {redis_key} does not exist")
+            return {"error": "Redis key not found"}
         if redis_data is None:
-            raise HTTPException(status_code=404, detail="Redis key not found")
+            return {"error": f"No data found for the key {redis_key}"}
         # Convert the redis data to a di
+
+        return redis_data
 
     except Exception as e:
         logging.error(f"Error retrieving data from Redis: {str(e)}")
         return {"error": "Failed to retrieve data from Redis"}
 
-
-def format_response(result: Dict[str, Any]) -> list:
-    # To ensure we always return a list of dictionaries
-    try:
-        if isinstance(result, dict):
-            return [{key: value} for key, value in result.items()]
-        elif isinstance(result, list):
-            return result  # Already in correct format
-        else:
-            raise ValueError("Unexpected response format")
-    except Exception as e:
-        logging.error(f"Error formatting response: {str(e)}")
-    
-
-def configure_data()-> None:
-    """
-    Function to configure the data that has been passed 
-
-    Function is to take the raw data, convert to dframe and 
-    then check the data types of the columns and format a response
-    based on the data types of the columns for processing
-
-    """
-
-
-
-    pass
 
 
 

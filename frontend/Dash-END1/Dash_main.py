@@ -535,7 +535,17 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
         redis_key = manual_key_entry or (redis_key_store[-1] if redis_key_store else None)
         if redis_key:
             try:
-                redis_data = redis_client.get(redis_key)
+                # Fetch data from Redis using the key if exists
+                if redis_client.exists(redis_key):
+                    logging.info(f"Redis key {redis_key} exists")
+                    redis_data = redis_client.get(redis_key)
+                else:
+                    logging.info(f"Redis key {redis_key} does not exist")
+                    return (
+                        f"Redis key {redis_key} does not exist", [], [], store_data,
+                        redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
+                        dash.no_update, dash.no_update, [], []
+                    )
                 if redis_data:
                     redis_data = json.loads(redis_data)
                     dataframe = pd.DataFrame(redis_data)
@@ -758,15 +768,10 @@ def send_data_for_processing(redis_key_proc):
     endpoint_ip = config['endpoints']['backend']['ip']
     endpoint_port = config['endpoints']['backend']['port']
     logging.info(f"Sending data for processing to {endpoint_ip}:{endpoint_port}")
-    data = {
-    "values": [
-        {"sensor": "A", "reading": 10},
-        {"sensor": "B", "reading": 20},
-        {"sensor": "C", "reading": 30}
-    ]}
-    
-    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats&redis_key={redis_key_proc}'  # updated to take the table name from the dropdown
 
+
+    
+    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats&redis_key={redis_key_proc}'  
     response = requests.post(url, json=data)
     
     if response.status_code == 500:
