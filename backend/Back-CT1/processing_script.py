@@ -15,6 +15,10 @@ from typing import Dict, Any
 import numpy as np
 import pandas as pd
 import json
+import logging
+
+# setup_processing_logging
+logging.basicConfig(filename="processing.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
 
 
@@ -22,25 +26,34 @@ import json
 
 def configure_data(raw_data):
 
-    data_dict = _desc_data(raw_data)
+    logging.info("Configuring data...")  # Log data configuration event
+    data_dict, df= _desc_data(raw_data)
 
-    dataframe = data_dict.get("df")
 
-    pass
+    return data_dict, df
 
 
 
 def _desc_data(raw_data):
+
+    logging.info("Describing data...")  # Log data description event
+
     
     try:
         # Convert raw data to DataFrame
+        
+        if isinstance(raw_data, bytes):
+            raw_data = raw_data.decode('utf-8')
+
         df = pd.read_json(raw_data)
 
+        logging.info(f"DataFrame shape: {df.shape}")  # Log DataFrame shape
         data_column_info = []
         is_time_data = False  # Will be set True if *any* col is time-like
 
         for col in df.columns:
-            cols_info = {}  # new dict per column!
+            logging.info(f"Processing column: {col}")  # Log column processing event
+            cols_info = {}  # new dict per column
 
             cols_info['name'] = col
             cols_info['type'] = str(df[col].dtype)
@@ -48,7 +61,7 @@ def _desc_data(raw_data):
             cols_info['is_numeric'] = pd.api.types.is_numeric_dtype(df[col])
             cols_info['is_integer'] = pd.api.types.is_integer_dtype(df[col])
             cols_info['is_float'] = pd.api.types.is_float_dtype(df[col])
-            cols_info['is_categorical'] = pd.api.types.is_categorical_dtype(df[col])
+            cols_info['is_categorical'] = isinstance(df[col].dtype, pd.CategoricalDtype)
             cols_info['is_boolean'] = pd.api.types.is_bool_dtype(df[col])
             cols_info['is_text'] = pd.api.types.is_string_dtype(df[col])
 
@@ -67,8 +80,8 @@ def _desc_data(raw_data):
             "columns": data_column_info,
             "is_time_data": is_time_data,
             "total_numeric_cols": len([col for col in data_column_info if col['is_numeric']]),
-            "df": df  # return converted df 
-        }
+            
+        }, df
 
     except Exception as e:
         return {"error": f"Failed to configure data - {str(e)}"}

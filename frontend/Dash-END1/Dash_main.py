@@ -618,13 +618,31 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
 
     # Process Data for Analysis
     if button_id == 'process-data' and process_btn > 0:
-        store_data['get_data_clicks'] += 1  
+        logging.info(f"Processing Data - Code")
         try:
             data = send_data_for_processing(to_process_key)
-            store_data['onscreen_data'] = data
-            dataframe = pd.DataFrame(data)
+            logging.info(f"Processing Data - Redis Key: {to_process_key}")
+            redis_key = data.get("redis_key")
+            logging.info(f"Processing Data - Redis Key: {redis_key}")
+            if redis_key:
+                if not processed_key_store:
+                    processed_key_store = []
+                processed_key_store.append(redis_key)
+                return(
+                    f"Data processed. Redis Key: {redis_key}",[], [], store_data, 
+                    dash.no_update, dash.no_update, processed_key_store, html.Ul([html.Li(key) for key in processed_key_store]),
+                    dash.no_update, dash.no_update, [], []
+                )
+
+            return ("Failed to process data.", [], [], store_data, 
+                    dash.no_update, dash.no_update, processed_key_store, html.Ul([html.Li(key) for key in processed_key_store]),
+                    dash.no_update, dash.no_update, [], [])
         except Exception as e:
             logging.error(f"Error processing data: {e}")
+            return (f"Error processing data: {e}", [], [], store_data, 
+                    dash.no_update, dash.no_update, processed_key_store, html.Ul([html.Li(key) for key in processed_key_store]),
+                    dash.no_update, dash.no_update, [], [])
+
 
 
     # Config Page
@@ -771,18 +789,10 @@ def send_data_for_processing(redis_key_proc):
 
 
     
-    url = f'http://{endpoint_ip}:{endpoint_port}/rec_req?operation=stats&redis_key={redis_key_proc}'  
-    response = requests.post(url, json=data)
-    
-    if response.status_code == 500:
-        return [{"Error": "Error in getting data"}]
-    response = response.json()
-
-    
-    # flatten processed in the response
-    response = response['processed']
-
-    return response
+    url = f'http://{endpoint_ip}:{endpoint_port}/process_data?operation=stats&redis_key={redis_key_proc}'  
+    response_json = requests.post(url)
+    logging.info(f"Response Rec: {response_json}")
+    return response_json.json()
 
 
 
