@@ -98,12 +98,13 @@ def process_data(redis_key: str = None):
     # begin processing the data
    
     logging.info(f"Data to process: available")
-    data_info_df = processing.configure_data(op_data)
+    logging.info(f"Calling processing script...")
+    data_info, df = processing.configure_data(op_data)
     # strip data_info of the dataframe
-    data_info = data_info_df.pop("df", None)
     logging.info(f"Data info: {data_info}")
     # W.I.P - 
     # send data to redis store 
+    logging.info(f"Sending processed data to Redis...")
     proc_key = send_processed_data_to_redis(data_info)
 
     return {"redis_key": proc_key}
@@ -143,17 +144,18 @@ def send_processed_data_to_redis(data):
     """
     Function to send the processed data back to the redis store
     """
-
+    logging.info(f"Sending processed data to Redis... func")
     try:
         # Convert the data to JSON
+        logging.info(f"Converting data to JSON...")
         json_data = json.dumps(data)
 
         # Generate a unique key for the processed data
         redis_key = f"processed_data:{random.randint(1, 10000)}"
-
+        logging.info(f"Generated Redis key: {redis_key}")
         # Store the processed data in Redis
         redis_client.set(redis_key, json_data)
-
+        
         return redis_key
     except Exception as e:
         logging.error(f"Error sending data to Redis: {str(e)}")
