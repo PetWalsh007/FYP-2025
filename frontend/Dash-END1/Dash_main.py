@@ -572,9 +572,12 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
         redis_key = manual_processed_key_entry or (processed_key_store[-1] if processed_key_store else None)
         if redis_key:
             try:
+                logging.info(f"Fetching Redis Key - Processed Data: {redis_key}")
                 redis_data = redis_client.get(redis_key)
+                logging.info(f"Redis key {redis_key} exists")
                 if redis_data:
                     redis_data = json.loads(redis_data)
+                    logging.info(f"Redis data loaded")
                     dataframe = pd.DataFrame(redis_data)
                     column_options = [{"label": col, "value": col} for col in dataframe.columns]
                     # update to ensure that columns that are not numeric are not shown in the y axis dropdown but string types that contian only numeric (steps) are allowed to be plotted

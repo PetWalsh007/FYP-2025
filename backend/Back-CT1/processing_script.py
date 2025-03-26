@@ -18,7 +18,7 @@ import json
 import logging
 
 # setup_processing_logging
-logging.basicConfig(filename="processing.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 
@@ -26,7 +26,7 @@ logging.basicConfig(filename="processing.log", level=logging.INFO, format="%(asc
 
 def configure_data(raw_data):
 
-    logging.info("Configuring data...")  # Log data configuration event
+    logger.info("Configuring data...")  # Log data configuration event
     data_dict, df= _desc_data(raw_data)
 
 
@@ -36,7 +36,7 @@ def configure_data(raw_data):
 
 def _desc_data(raw_data):
 
-    logging.info("Describing data...")  # Log data description event
+    logger.info("Describing data...")  # Log data description event
 
     
     try:
@@ -47,16 +47,20 @@ def _desc_data(raw_data):
 
         df = pd.read_json(raw_data)
 
-        logging.info(f"DataFrame shape: {df.shape}")  # Log DataFrame shape
+        logger.info(f"DataFrame shape: {df.shape}")  # Log DataFrame shape
         data_column_info = []
         is_time_data = False  # Will be set True if *any* col is time-like
 
         # 
         # https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_datetime64_any_dtype.html
+        # This and similar are used to check the data types of the columns in the dataframe
+        # https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_numeric_dtype.html
+        # https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_integer_dtype.html
+        
 
 
         for col in df.columns:
-            logging.info(f"Processing column: {col}")  # Log column processing event
+            logger.info(f"Processing column: {col}")  # Log column processing event
             cols_info = {}  # new dict per column
 
             cols_info['name'] = col
