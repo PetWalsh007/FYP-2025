@@ -107,8 +107,10 @@ def process_data(redis_key: str = None, operation: str = None):
     # W.I.P - 
 
     # After getting the data info, we need a pipeline to make decisions on what to do with the data - specifically time series vs non time series data
-    
-    
+    # We must define a check to ensure that the data we have is inlien with the requried data processing needed 
+    # this in line with the required processing requested by the user 
+    # ^ update needed to handling incoming process request parameter
+
 
 
     # send data to redis store 
