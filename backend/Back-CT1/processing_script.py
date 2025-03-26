@@ -51,6 +51,10 @@ def _desc_data(raw_data):
         data_column_info = []
         is_time_data = False  # Will be set True if *any* col is time-like
 
+        # 
+        # https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_datetime64_any_dtype.html
+
+
         for col in df.columns:
             logging.info(f"Processing column: {col}")  # Log column processing event
             cols_info = {}  # new dict per column
@@ -70,7 +74,9 @@ def _desc_data(raw_data):
 
             data_column_info.append(cols_info)
 
-
+        # get the names of the columns that are time data
+        time_columns = None
+        time_columns = [cols_info['name'] for cols_info in data_column_info if cols_info['is_time_data']]
      
 
 
@@ -79,8 +85,8 @@ def _desc_data(raw_data):
             "shape": df.shape,
             "columns": data_column_info,
             "is_time_data": is_time_data,
-            "total_numeric_cols": len([col for col in data_column_info if col['is_numeric']]),
-            
+            "time_columns_position": time_columns,
+            "total_numeric_cols": len([col for col in data_column_info if col['is_numeric']]) or None,
         }, df
 
     except Exception as e:

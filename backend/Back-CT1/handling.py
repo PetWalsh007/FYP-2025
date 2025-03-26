@@ -23,6 +23,7 @@ import processing_script as processing
 
 import simple_analysis as smp
 
+import datetime
 
 
 
@@ -85,7 +86,7 @@ async def rec_req(redis_key: str = None):
 
 # process the data 
 @app.post("/process_data")
-def process_data(redis_key: str = None):
+def process_data(redis_key: str = None, operation: str = None):
     """
     Function to process the data that has been passed in the request
     """
@@ -103,9 +104,26 @@ def process_data(redis_key: str = None):
     # strip data_info of the dataframe
     logging.info(f"Data info: {data_info}")
     # W.I.P - 
+
+    # After getting the data info, we need a pipeline to make decisions on what to do with the data - specifically time series vs non time series data
+    
+    if data_info['is_time_data']:
+        # if the data is time series data, we need to process it as such
+        logging.info(f"Data is time series data")
+        # call the step analysis function
+        time_col_name = data_info['time_columns_position'][0]
+        logging.info(f"Time column name: {time_col_name}")
+
+    time_col = df[time_col_name]
+
+
+    # need to serialize the data to send to redis
+
+
+
     # send data to redis store 
     logging.info(f"Sending processed data to Redis...")
-    proc_key = send_processed_data_to_redis(data_info)
+    proc_key = send_processed_data_to_redis(time_col)
 
     return {"redis_key": proc_key}
 
@@ -139,12 +157,21 @@ def get_redis_data(redis_key):
         return {"error": "Failed to retrieve data from Redis"}
 
 
+
+# https://stackoverflow.com/questions/10252010/serializing-class-instance-to-json 
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
 def send_processed_data_to_redis(data):
 
     """
     Function to send the processed data back to the redis store
     """
     logging.info(f"Sending processed data to Redis... func")
+    data = data.tolist()  # Convert the data to a list
     try:
         # Convert the data to JSON
         logging.info(f"Converting data to JSON...")
@@ -154,8 +181,9 @@ def send_processed_data_to_redis(data):
         redis_key = f"processed_data:{random.randint(1, 10000)}"
         logging.info(f"Generated Redis key: {redis_key}")
         # Store the processed data in Redis
-        redis_client.set(redis_key, json_data)
+        redis_client.set(redis_key, json.dumps(data, default=json_serial), ex=7200)  # TTL to 2 hours
         
+
         return redis_key
     except Exception as e:
         logging.error(f"Error sending data to Redis: {str(e)}")
