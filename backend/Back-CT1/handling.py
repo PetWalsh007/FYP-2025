@@ -113,9 +113,13 @@ def process_data(redis_key: str = None, operation: str = None):
 
 
 
+    updated_data = smp.daily_average(df, data_info)
+
+    
+
     # send data to redis store 
     logger.info(f"Sending processed data to Redis...")
-    proc_key = send_processed_data_to_redis(df)
+    proc_key = send_processed_data_to_redis(updated_data)
 
     return {"redis_key": proc_key}
 
