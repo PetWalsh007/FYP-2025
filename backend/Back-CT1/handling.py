@@ -117,6 +117,7 @@ def process_data(redis_key: str = None, operation: str = None):
 
     
 
+
     # send data to redis store 
     logger.info(f"Sending processed data to Redis...")
     proc_key = send_processed_data_to_redis(updated_data)
@@ -156,7 +157,7 @@ def get_redis_data(redis_key):
 
 # https://stackoverflow.com/questions/10252010/serializing-class-instance-to-json 
 def json_serial(obj):
-    logger.info(f"Serializing object of type {type(obj)}")
+    #logger.info(f"Serializing object of type {type(obj)}")
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, (datetime.datetime, datetime.date)):
         return obj.isoformat()

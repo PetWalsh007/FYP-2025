@@ -47,6 +47,8 @@ def _desc_data(raw_data):
 
         df = pd.read_json(raw_data)
 
+
+
         logger.info(f"DataFrame shape: {df.shape}")  # Log DataFrame shape
         data_column_info = []
         is_time_data = False  # Will be set True if *any* col is time-like
@@ -62,10 +64,22 @@ def _desc_data(raw_data):
         for col in df.columns:
             logger.info(f"Processing column: {col}")  # Log column processing event
             cols_info = {}  # new dict per column
-
+            # remove whitespace from column names
+            col = col.strip()
+            
             cols_info['name'] = col
+            # parse name in the columns to check for dates, datetime, time etc 
+            date_list = ['date', 'datetime', 'time', 'timestamp', 'timezone', 'date_time', 'time_stamp' ]
+            logger.info(f"Checking for date in column name: {col}")  # Log date check event
+            time_flag = any(date in cols_info['name'].lower() for date in date_list)
+            cols_info['is_time_data'] = time_flag or pd.api.types.is_datetime64_any_dtype(df[col])
+            if time_flag:
+                    try:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                    except:
+                        pass
+
             cols_info['type'] = str(df[col].dtype)
-            cols_info['is_time_data'] = pd.api.types.is_datetime64_any_dtype(df[col])
             cols_info['is_numeric'] = pd.api.types.is_numeric_dtype(df[col])
             cols_info['is_integer'] = pd.api.types.is_integer_dtype(df[col])
             cols_info['is_float'] = pd.api.types.is_float_dtype(df[col])
