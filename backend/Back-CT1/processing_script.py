@@ -60,6 +60,10 @@ def _desc_data(raw_data):
         # https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_integer_dtype.html
         
 
+        # drop the first column (assumed to be ID or index)
+        logger.info(f"Initial DataFrame shape: {df.shape}")  # Log initial DataFrame shape
+        df.drop(df.columns[0], axis=1, inplace=True)
+        logger.info(f"DataFrame shape after dropping first column: {df.shape}")  # Log DataFrame shape after dropping first column
 
         for col in df.columns:
             logger.info(f"Processing column: {col}")  # Log column processing event

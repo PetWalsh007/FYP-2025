@@ -47,8 +47,11 @@ async def lifespan(app):
     # connect to backend Postgres DB 
     logging.info("Connecting to Postgres Server database...")
 
-    
-    postgres_server_con = open_server_db_con()
+    try:
+        postgres_server_con = open_server_db_con()
+    except Exception as e:
+        logging.error(f"Error While starting connection to backend database server: {e}")
+        postgres_server_con = None
 
     logging.info("Database connections initialized.")
     logging.info("***********************************")
@@ -125,7 +128,7 @@ async def get_data(database: str = "null", table_name: str = "null", fil_conditi
         if table_name:
             date_filter = ""
             if start and end:
-                date_filter = f" AND date_column BETWEEN '{start}' AND '{end}'"
+                date_filter = f" AND {table_name}.datetime BETWEEN '{start}' AND '{end}'"
             query = f"SELECT * from {table_name} WHERE {fil_condition}{date_filter}"
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await postgres(query)
@@ -152,6 +155,29 @@ async def get_command(rst: str = "null"):
         return {"error": "No command provided"}
     
 
+@app.post("/store_processed_data")
+async def rec_store_req(key_proc: str = "null", key_raw: str = "null", analysis_type: str = "null"):  
+    # recieve the request from backend to store in redis db - redis_processed_log - this will be passed to 
+    logging.info(f"Received request for /store_processed_data with key_proc: {key_proc}, key_raw: {key_raw}, analysis_type: {analysis_type}")
+    if postgres_server_con.conn is None:
+        if postgres_server_con.con_err:
+            logging.error(f"Postgres Server connection error: {postgres_server_con.con_err}")
+            return postgres_server_con.con_err
+        else:
+            logging.error("Postgres Server connection not established")
+            return {"error": "SQL Server connection not established"}
+    
+    table = "redis_data.redis_processed_log"
+    query = f"INSERT INTO {table} (redis_processed_key, redis_key, analysis_type, processed_request) VALUES (?, ?, ?, ?)"
+    values = (key_proc, key_raw, analysis_type, 1)
+    try:
+        postgres_server_con.cursor.execute(query, values)
+        postgres_server_con.conn.commit()
+        logging.info(f"Query executed successfully: {query}")
+    except Exception as e:
+        logging.error(f"Error executing query: {e}")
+        return {"error": "Error executing query"}
+
 def store_query_data(key, qry, query_table, query_db):
     # this will take the redis key and the query and store iin the data base 
 
@@ -170,6 +196,7 @@ def store_query_data(key, qry, query_table, query_db):
     table = "redis_data.redis_cache_log"
     query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table) VALUES (?, ?, ?, ?)"
        
+
     values = (key, qry, query_db, query_table)
 
     logging.info(f"Executing Postgres Server query: {query} with values {values}")
@@ -258,18 +285,3 @@ def open_server_db_con():
         postgres_con2 = None
         return postgres_con2
     
-
-
-
-@app.get("/config")
-def get_config(service_config: str = "null"):
-    # This will return the config file for the service requested
-    config = None
-    # send predefined request for latest config file
-    get_config_data(service_config)
-
-
-
-def get_config_data(file_name):
-   
-   pass 

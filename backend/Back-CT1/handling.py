@@ -111,20 +111,63 @@ def process_data(redis_key: str = None, operation: str = None):
     # this in line with the required processing requested by the user 
     # ^ update needed to handling incoming process request parameter
 
+    try:
+        if operation == "Smp_Daily_Avg":
+            logger.info(f"Processing data for daily average... calling analysis function")
+            updated_data_df = smp.daily_average(df, data_info)
+
+        
 
 
-    updated_data = smp.daily_average(df, data_info)
+        # send data to redis store 
+        logger.info(f"Sending processed data to Redis...")
+        proc_key = send_processed_data_to_redis(updated_data_df)
 
+        try:
+            val = send_data_to_server_db( proc_key, redis_key, operation, flag=1)
+            try: 
+                if "error" in val:
+                    logger.error(f"Error sending data to server: {val['error']}")
+                    return {"error": val["error"]}
+                else:
+                    logger.info(f"Data sent to server successfully: {val}")
+            except Exception as e:
+                logger.error(f"Error processing server response: {str(e)}")
+                return {"error": "Failed to process server response"}
+        except Exception as e:
+            logger.error(f"Error sending data to server: {str(e)}")
+            return {"error": "Failed to send data to server"}
+
+        return {"redis_key": proc_key}
+    except:
+        logger.error(f"Unsupported operation: {operation}")
+        return {"error": "Unsupported operation"}
     
 
-
-    # send data to redis store 
-    logger.info(f"Sending processed data to Redis...")
-    proc_key = send_processed_data_to_redis(updated_data)
-
-    return {"redis_key": proc_key}
+    # send the processed data to internal server
 
 
+def send_data_to_server_db(proc_key: str, redis_key: str, operation: str, flag: int):
+    """
+    Function to send processed data to the internal server database.
+    """
+    try:
+        logger.info(f"Sending data to server with proc_key: {proc_key}, redis_key: {redis_key}, operation: {operation}, flag: {flag}")
+        # Placeholder for actual implementation
+        url = f"http://192.168.1.81:8000/store_processed_data?key_proc={proc_key}&key_raw={redis_key}&analysis_type={operation}&flag={flag}"  
+        response = requests.post(url)
+        
+        if response.status_code != 200:
+            logger.error(f"Failed to send data to server. Status code: {response.status_code}, Response: {response.text}")
+            return {"error": "Failed to send data to server"}
+        
+
+
+        
+        return {"status": "success", "message": "Data sent to server successfully"}
+    except Exception as e:
+        logger.error(f"Error in send_data_to_server_db: {str(e)}")
+        return {"error": "Failed to send data to server"}
 
 
 def get_redis_data(redis_key):

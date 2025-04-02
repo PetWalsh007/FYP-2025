@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def daily_average(dataframe, info):
-
+    logger.info("Starting  function")
     # take time series data nad compute the daily average over the number of days in the datapoints
 
     # Check if the DataFrame has a 'timestamp' column
@@ -37,10 +37,53 @@ def daily_average(dataframe, info):
     
     
     """
+    # Function accepts a dataframe and a dictionary with information about the data
+    # Returns a new dataframe with differnt infomation that can be displayed in the front end
+    try:
+        logger.info("Starting daily_average function")
+       
 
-    dataframe2 = pd.DataFrame()
+        
+        time_position = info.get("time_columns_position", [])
+        if not time_position:
+            raise ValueError("No time column position provided in info dictionary.")
 
+       
+        timestamp_raw = time_position[0]
 
-    return dataframe2
+        if isinstance(timestamp_raw, str):
+            timestamp_col = timestamp_raw
+        elif isinstance(timestamp_raw, int):
+            timestamp_col = dataframe.columns[timestamp_raw]
+        else:
+            raise TypeError(f"Invalid type for time column reference: {type(timestamp_raw)}")
+
+        logger.info(f"Timestamp column identified: '{timestamp_col}'")
+
+        
+        dataframe[timestamp_col] = pd.to_datetime(dataframe[timestamp_col], errors='coerce')
+        dataframe = dataframe.dropna(subset=[timestamp_col])
+
+       
+        dataframe["date"] = dataframe[timestamp_col].dt.date
+
+        # Get numeric column names from info dict
+        numeric_cols = [col["name"] for col in info.get("columns", []) if col.get("is_numeric")]
+        if timestamp_col in numeric_cols:
+            numeric_cols.remove(timestamp_col)  # Remove timestamp col if marked numeric
+
+        logger.info(f"Numeric columns used for averaging: {numeric_cols}")
+
+        # Compute daily average with groupby
+        daily_avg_df = dataframe.groupby("date")[numeric_cols].mean().reset_index()
+
+        
+
+        return daily_avg_df
+
+    except Exception as e:
+        logger.error(f"Error in daily_average: {str(e)}")
+        return pd.DataFrame({"error": [str(e)]})
+
 
    
