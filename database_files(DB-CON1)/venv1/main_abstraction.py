@@ -16,7 +16,7 @@ import redis as rd
 import random
 import json
 from datetime import datetime
-
+import time as time
 
 logging.basicConfig(filename="fastapi_lifespan.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -24,34 +24,107 @@ redis_host ='192.168.1.83'
 redis_port = 6379
 # Updated from FASTAPI docs to use async context manager https://fastapi.tiangolo.com/advanced/events/#lifespan
 
+global postgres_server_con
+
+
+
+def app_startup_routine():
+    # this will serve as the app startup routine to check if the database connections are established 
+    global postgres_server_con  
+    attempt = 0
+    max_attempts = 5
+    logging.info("***********************************")
+    logging.info("Starting FastAPI lifespan function...")
+    logging.info("Connecting to Postgres Server side database...")
+
+    while postgres_server_con is None or attempt < max_attempts:
+        try:
+            postgres_server_con = open_server_db_con()
+        except Exception as e:
+            logging.error(f"Error While starting connection to backend database server: {e}")
+            postgres_server_con = None
+        time.sleep((5*attempt)+3)
+        attempt += 1
+        wait_time = (5 * attempt) + 3
+        logging.info(f"Retrying in {wait_time}s... (Attempt {attempt}/{max_attempts})")
+        time.sleep(wait_time)
+
+    if postgres_server_con is None:
+        logging.error("Max attempts reached for Postgres Server DB connection.")
+        logging.error("Check connection string, server status, or network access.")
+        logging.info("***********************************")
+
+    pass
+
+def connect_to_external_servers():
+    # this will connect to the external servers and check if they are up and running 
+    # we can use this to check if the servers are up and running before starting the app
+    global sqls_con
+    global postgres_con
+
+    try:
+        cursor = postgres_server_con.cursor()
+        cursor.execute("""
+            SELECT 
+                endpoint_name, endpoint_type, endpoint_ip, endpoint_port,
+                driver_name, database_name, connection_uname, connection_pwd
+            FROM "Platform-Data".databases
+            WHERE is_active = TRUE
+        """)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            (
+                endpoint_name, endpoint_type, endpoint_ip, endpoint_port,
+                driver_name, database_name, connection_uname, connection_pwd
+            ) = row
+
+            logging.info(f"Attempting to connect to {endpoint_name} [{endpoint_type}] at {endpoint_ip}:{endpoint_port}...")
+
+            try:
+                if endpoint_type == 'sqlserver':
+                    sqls_con = connectcls_sql_server(
+                        driver_name, endpoint_ip, database_name, connection_uname, connection_pwd
+                    )
+                    logging.info(f"SQL Server connection [{endpoint_name}] established.")
+
+                elif endpoint_type == 'postgresql':
+                    postgres_con = connectcls_postgres(
+                        driver_name=driver_name,
+                        server_name=endpoint_ip,
+                        db_name=database_name,
+                        connection_username=connection_uname,
+                        connection_password=connection_pwd
+                    )
+                    logging.info(f"PostgreSQL connection [{endpoint_name}] established.")
+
+                else:
+                    logging.warning(f"Unsupported DB type: {endpoint_type} for {endpoint_name}")
+
+            except Exception as e:
+                logging.error(f"Failed to connect to {endpoint_name}: {e}")
+
+    except Exception as e:
+        logging.error(f"Error fetching external DB config: {e}")
+    pass
+
+
 
 @asynccontextmanager
 async def lifespan(app):
     # Runs at FastAPI startup
-    global sqls_con 
-    global postgres_con 
+
     global redis_client
-    global postgres_server_con
-    logging.info("***********************************")
-    logging.info("Starting FastAPI lifespan function...")
-    sqls_con = connectcls_sql_server('ODBC Driver 17 for SQL Server', '192.168.1.50', 'Test_db01', 'sa', '01-SQL-DEV-01')
-    
-    postgres_con = connectcls_postgres(
-        driver_name="PostgreSQL Unicode",
-        server_name="192.168.1.55",
-        db_name="Test_DB",
-        connection_username="test_user",
-        connection_password="test_user"
-    )
+ 
+
+    app_startup_routine()
+
+
 
     # connect to backend Postgres DB 
     logging.info("Connecting to Postgres Server database...")
 
-    try:
-        postgres_server_con = open_server_db_con()
-    except Exception as e:
-        logging.error(f"Error While starting connection to backend database server: {e}")
-        postgres_server_con = None
+
 
     logging.info("Database connections initialized.")
     logging.info("***********************************")

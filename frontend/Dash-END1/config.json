@@ -1,25 +1,20 @@
 {
     "databases": {
         "postgres": {
-            "server": {
-                "ip": "192.168.1.81"
-            },
             "database": {
                 "tables": [
-                    "plc_step_test",
-                    "TEST"
+                    "plc_step_test"
                 ]
             }
         },
         "sql_server": {
-            "server": {
-                "ip": "192.168.1.50"
-            },
             "database": {
                 "tables": [
+                    "Device_Sensor_Data",
                     "HistoricalData",
                     "PLC_Area_X",
-                    "testtable"
+                    "Energy_PLC_Area_Y",
+                    "Energy_PLC_Area_Z"
                 ]
             }
         }
@@ -36,10 +31,6 @@
         {
             "label": "MySQL",
             "value": "mysql"
-        },
-        {
-            "label": "TEST",
-            "value": "test db"
         }
     ],
     "endpoints": {
@@ -60,6 +51,14 @@
         {
             "label": "PLC Step Time ",
             "value": "PLC_step_time"
+        },
+        {
+            "label": "Simple Daily Average",
+            "value": "Smp_Daily_Avg"
+        },
+        {
+            "label": "DTW Analysis",
+            "value": "DTW_analysis"
         }
     ]
 }
