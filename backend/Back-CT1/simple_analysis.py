@@ -39,18 +39,17 @@ def daily_average(dataframe, info):
     """
     # Function accepts a dataframe and a dictionary with information about the data
     # Returns a new dataframe with differnt infomation that can be displayed in the front end
+   
+def daily_average(dataframe, info):
+    logger.info("Starting daily_average function")
     try:
-        logger.info("Starting daily_average function")
-       
-
-        
+        # Get the position of the timestamp column from the info dictionary
         time_position = info.get("time_columns_position", [])
         if not time_position:
             raise ValueError("No time column position provided in info dictionary.")
 
-       
+        # Identify the timestamp column
         timestamp_raw = time_position[0]
-
         if isinstance(timestamp_raw, str):
             timestamp_col = timestamp_raw
         elif isinstance(timestamp_raw, int):
@@ -60,24 +59,49 @@ def daily_average(dataframe, info):
 
         logger.info(f"Timestamp column identified: '{timestamp_col}'")
 
-        
-        dataframe[timestamp_col] = pd.to_datetime(dataframe[timestamp_col], errors='coerce')
-        dataframe = dataframe.dropna(subset=[timestamp_col])
+        # Log the shape of the original DataFrame
+        logger.info(f"Original DataFrame shape: {dataframe.shape}")
 
-       
+     
+        #dataframe[timestamp_col] = dataframe[timestamp_col].astype(str).str.strip()
+
+      
+        #dataframe[timestamp_col] = pd.to_datetime(dataframe[timestamp_col], errors='coerce')
+
+        # find and log the first rows of na values in the timestamp column
+        na_rows = dataframe[dataframe[timestamp_col].isna()]
+        if not na_rows.empty:
+            logger.info(f"First 5 rows with NaT in '{timestamp_col}': {na_rows.head(5)}")
+        else:
+            logger.info(f"No NaT values found in '{timestamp_col}' column.")
+            
+
+        # Log type of the timestamp column
+        logger.info(f"Timestamp column type after conversion: {dataframe[timestamp_col].dtype}")
+        # Log invalid timestamps
+        invalid_timestamps = dataframe[dataframe[timestamp_col].isna()]
+        invalid_timestamps = dataframe[dataframe[timestamp_col].isna() | (dataframe[timestamp_col] == pd.NaT)]
+        if len(invalid_timestamps) > 0:
+            logger.error(f"Found {len(invalid_timestamps)} rows with invalid timestamps.")
+            # Log top 5 invalid timestamps
+            logger.debug(f"Invalid rows (top 5): {invalid_timestamps.head(5)}")
+
+
+        # Extract the date from the timestamp column
         dataframe["date"] = dataframe[timestamp_col].dt.date
 
-        # Get numeric column names from info dict
+        # Get numeric column names from the info dictionary
         numeric_cols = [col["name"] for col in info.get("columns", []) if col.get("is_numeric")]
         if timestamp_col in numeric_cols:
-            numeric_cols.remove(timestamp_col)  # Remove timestamp col if marked numeric
+            numeric_cols.remove(timestamp_col)  # Remove timestamp column if marked numeric
 
         logger.info(f"Numeric columns used for averaging: {numeric_cols}")
 
-        # Compute daily average with groupby
+        # Compute daily average using groupby
         daily_avg_df = dataframe.groupby("date")[numeric_cols].mean().reset_index()
 
-        
+        # Log the total number of rows in the resulting DataFrame
+        logger.info(f"Total rows in the daily average DataFrame: {len(daily_avg_df)}")
 
         return daily_avg_df
 

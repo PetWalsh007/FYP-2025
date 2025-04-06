@@ -78,11 +78,49 @@ def _desc_data(raw_data):
             time_flag = any(date in cols_info['name'].lower() for date in date_list)
             cols_info['is_time_data'] = time_flag or pd.api.types.is_datetime64_any_dtype(df[col])
             if time_flag:
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    pass
+                else:
+                    logger.info(f"Column {col} is flagged as time data based on name")  # Log time flag event
+                    # number of rows in the column
+                    num_rows = len(df[col])
+                    logger.info(f"Number of rows in column {col}: {num_rows}")  # Log number of rows in column
                     try:
-                        df[col] = pd.to_datetime(df[col], errors='coerce')
-                    except:
-                        pass
+                        # regex to check for time format - remove any extra digits after 6 decimal places top keep all times consistent 
+                        # Initital find for this potential error was from this https://stackoverflow.com/questions/43190950/serializing-datetime-with-fraction-of-seconds-inconsistency-net 
+                        # https://stackoverflow.com/questions/5476065/how-to-truncate-the-time-on-a-datetime-object - datetime objects not truncatable
+                        # Cant operate on datetime objects so convert to string first and the fix is to use regex to find the decimal point and then check for 6 digits after it - make all points consistent to allow 
+                        # pd.to_datetime to work correctly
 
+
+                        # r'(?<!\.\d{6})$' - look for a decimal point not followed by 6 digits at the end of the string
+                        # convert to string 
+                        # string replace 
+                        # find pattern with a negative lookbehind to see if decimal point is not followed by 6 digits
+                        # if pattern is true - add .000000 
+                        df[col] = df[col].astype(str).str.replace(r'(?<!\.\d{6})$', '.000000', regex=True)
+
+                        # simiar here use string replace 
+                        # find pattern of decimal point - takes first 6 digits after decimal point 
+                        # replace with 6 digits only - removes extra digits
+                        # match '.' then find 6 digits and replace with 6 digits only 
+                        df[col] = df[col].str.replace(r'(\.\d{6})\d+', r'\1', regex=True)
+
+                        # Convert to datetime
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+
+                        # Check for NaT values after conversion
+                        na_rows = df[df[col].isna()]
+                        if not na_rows.empty:
+                            logger.info(f"First 5 rows with NaT in '{col}': {na_rows.head(5)}")
+                        else:
+                            logger.info(f"No NaT values found in '{col}' column.")
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to convert column {col} to datetime: {e}")
+
+            logger.info(f"col has this many rows: {len(df[col])}")  # Log number of rows in column
+            time_flag = None  # reset flag for next column
             cols_info['type'] = str(df[col].dtype)
             cols_info['is_numeric'] = pd.api.types.is_numeric_dtype(df[col])
             cols_info['is_integer'] = pd.api.types.is_integer_dtype(df[col])
@@ -91,7 +129,7 @@ def _desc_data(raw_data):
             cols_info['is_boolean'] = pd.api.types.is_bool_dtype(df[col])
             cols_info['is_text'] = pd.api.types.is_string_dtype(df[col])
 
-            if cols_info['is_time_data']:
+            if cols_info['is_time_data'] == True:
                 is_time_data = True
 
             data_column_info.append(cols_info)

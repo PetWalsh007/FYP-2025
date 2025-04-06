@@ -154,7 +154,7 @@ def send_data_to_server_db(proc_key: str, redis_key: str, operation: str, flag: 
     try:
         logger.info(f"Sending data to server with proc_key: {proc_key}, redis_key: {redis_key}, operation: {operation}, flag: {flag}")
         # Placeholder for actual implementation
-        url = f"http://192.168.1.81:8000/store_processed_data?key_proc={proc_key}&key_raw={redis_key}&analysis_type={operation}&flag={flag}"  
+        url = f"http://192.168.1.81:8000/store_processed_data?key_proc={proc_key}&key_raw={redis_key}&analysis_type={operation}&flag={flag}"  # Replace with actual server URL
         response = requests.post(url)
         
         if response.status_code != 200:
@@ -163,7 +163,7 @@ def send_data_to_server_db(proc_key: str, redis_key: str, operation: str, flag: 
         
 
 
-        
+        # Add logic to send data to the server database here
         return {"status": "success", "message": "Data sent to server successfully"}
     except Exception as e:
         logger.error(f"Error in send_data_to_server_db: {str(e)}")
