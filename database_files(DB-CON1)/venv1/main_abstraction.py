@@ -22,15 +22,20 @@ logging.basicConfig(filename="fastapi_lifespan.log", level=logging.INFO, format=
 
 redis_host ='192.168.1.83'
 redis_port = 6379
+
+
 # Updated from FASTAPI docs to use async context manager https://fastapi.tiangolo.com/advanced/events/#lifespan
 
 global postgres_server_con
-
+# Global dictionary for all external DB connections
+db_connections = {}
 
 
 def app_startup_routine():
     # this will serve as the app startup routine to check if the database connections are established 
     global postgres_server_con  
+    global redis_client
+ 
     attempt = 0
     max_attempts = 5
     logging.info("***********************************")
@@ -54,14 +59,22 @@ def app_startup_routine():
         logging.error("Check connection string, server status, or network access.")
         logging.info("***********************************")
 
+
+    try:
+        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+        redis_client.ping()
+        logging.info("Connected to Redis server successfully.")
+    except rd.ConnectionError as e:
+        logging.error(f"Redis connection error: {e}")
+
     pass
 
 def connect_to_external_servers():
     # this will connect to the external servers and check if they are up and running 
     # we can use this to check if the servers are up and running before starting the app
-    global sqls_con
-    global postgres_con
 
+
+    
     try:
         cursor = postgres_server_con.cursor()
         cursor.execute("""
@@ -83,13 +96,13 @@ def connect_to_external_servers():
 
             try:
                 if endpoint_type == 'sqlserver':
-                    sqls_con = connectcls_sql_server(
+                    con = connectcls_sql_server(
                         driver_name, endpoint_ip, database_name, connection_uname, connection_pwd
                     )
                     logging.info(f"SQL Server connection [{endpoint_name}] established.")
 
                 elif endpoint_type == 'postgresql':
-                    postgres_con = connectcls_postgres(
+                    con = connectcls_postgres(
                         driver_name=driver_name,
                         server_name=endpoint_ip,
                         db_name=database_name,
@@ -103,6 +116,7 @@ def connect_to_external_servers():
 
             except Exception as e:
                 logging.error(f"Failed to connect to {endpoint_name}: {e}")
+            db_connections[endpoint_name] = con
 
     except Exception as e:
         logging.error(f"Error fetching external DB config: {e}")
@@ -114,39 +128,38 @@ def connect_to_external_servers():
 async def lifespan(app):
     # Runs at FastAPI startup
 
-    global redis_client
- 
+
 
     app_startup_routine()
 
 
+    # loop through the global db_connections dictionary and connect to the databases
+    for db_name, con in db_connections.items():
+        if con.conn is None:
+            logging.error(f"Connection to {db_name} failed.")
+        else:
+            logging.info(f"Connection to {db_name} established.")
 
-    # connect to backend Postgres DB 
-    logging.info("Connecting to Postgres Server database...")
 
 
 
-    logging.info("Database connections initialized.")
-    logging.info("***********************************")
-    logging.info(f"SQL Server connection established: {sqls_con.conn is not None}")
-    logging.info(f"PostgreSQL connection established: {postgres_con.conn is not None}")
-    logging.info("***********************************")
-
-    try:
-        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
-        redis_client.ping()
-        logging.info("Connected to Redis server successfully.")
-    except rd.ConnectionError as e:
-        logging.error(f"Redis connection error: {e}")
 
     yield
 
-    # Closing connection when the worker shuts down
-    if sqls_con:
-        sqls_con.close_connection()
+    # loop through the global db_connections dictionary and close the connections
 
-    if postgres_con:
-        postgres_con.close_connection()
+    for db_name, con in db_connections.items():
+        try:
+            if con.conn is not None:
+                con.close_connection()
+                logging.info(f"Connection to {db_name} closed.")
+            else:
+                logging.warning(f"Connection to {db_name} was not established.")
+        except Exception as e:
+            logging.error(f"Error closing connection to {db_name}: {e}")
+
+
+
     if postgres_server_con:
         postgres_server_con.close_connection()
     if redis_client:
@@ -250,6 +263,9 @@ async def rec_store_req(key_proc: str = "null", key_raw: str = "null", analysis_
     except Exception as e:
         logging.error(f"Error executing query: {e}")
         return {"error": "Error executing query"}
+
+
+
 
 def store_query_data(key, qry, query_table, query_db):
     # this will take the redis key and the query and store iin the data base 
