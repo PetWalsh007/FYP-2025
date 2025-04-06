@@ -21,12 +21,12 @@
     },
     "database_options": [
         {
-            "label": "Postgres",
-            "value": "postgres"
+            "label": "Postgres - 1",
+            "value": "postgres-test-db"
         },
         {
-            "label": "SQL Server",
-            "value": "sql_server"
+            "label": "SQL Server - 1",
+            "value": "sqlserver-test-db01"
         },
         {
             "label": "MySQL",

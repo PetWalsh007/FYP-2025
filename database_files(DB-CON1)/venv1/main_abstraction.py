@@ -26,10 +26,10 @@ redis_port = 6379
 
 # Updated from FASTAPI docs to use async context manager https://fastapi.tiangolo.com/advanced/events/#lifespan
 
-global postgres_server_con
+postgres_server_con = None  # Global variable for Postgres Server connection
 # Global dictionary for all external DB connections
 db_connections = {}
-
+redis_client = None  # Global variable for Redis connection
 
 def app_startup_routine():
     # this will serve as the app startup routine to check if the database connections are established 
@@ -45,6 +45,9 @@ def app_startup_routine():
     while postgres_server_con is None or attempt < max_attempts:
         try:
             postgres_server_con = open_server_db_con()
+            if postgres_server_con.conn is not None:
+                logging.info(f"Postgres Server connection established. {postgres_server_con}")
+                break
         except Exception as e:
             logging.error(f"Error While starting connection to backend database server: {e}")
             postgres_server_con = None
@@ -72,25 +75,29 @@ def app_startup_routine():
 def connect_to_external_servers():
     # this will connect to the external servers and check if they are up and running 
     # we can use this to check if the servers are up and running before starting the app
-
+    global postgres_server_con
 
     
     try:
-        cursor = postgres_server_con.cursor()
-        cursor.execute("""
+        
+        query = ("""
             SELECT 
                 endpoint_name, endpoint_type, endpoint_ip, endpoint_port,
                 driver_name, database_name, connection_uname, connection_pwd
             FROM "Platform-Data".databases
             WHERE is_active = TRUE
         """)
-        rows = cursor.fetchall()
+        rows = postgres_server_con.query(query)
 
         for row in rows:
-            (
-                endpoint_name, endpoint_type, endpoint_ip, endpoint_port,
-                driver_name, database_name, connection_uname, connection_pwd
-            ) = row
+            endpoint_name = row["endpoint_name"]
+            endpoint_type = row["endpoint_type"]
+            endpoint_ip = row["endpoint_ip"]
+            endpoint_port = row["endpoint_port"]
+            driver_name = row["driver_name"]
+            database_name = row["database_name"]
+            connection_uname = row["connection_uname"]
+            connection_pwd = row["connection_pwd"]
 
             logging.info(f"Attempting to connect to {endpoint_name} [{endpoint_type}] at {endpoint_ip}:{endpoint_port}...")
 
@@ -128,11 +135,12 @@ def connect_to_external_servers():
 async def lifespan(app):
     # Runs at FastAPI startup
 
-
+    global postgres_server_con
 
     app_startup_routine()
+    connect_to_external_servers()
 
-
+    logging.info("Connecting to external databases...")
     # loop through the global db_connections dictionary and connect to the databases
     for db_name, con in db_connections.items():
         if con.conn is None:
@@ -181,10 +189,13 @@ def json_serial(obj):
 
 
 @app.get("/data")
-async def get_data(database: str = "null", table_name: str = "null", fil_condition: str = '1=1', limit: int = 10, start: str = None, end: str = None):
+async def get_data(database: str = "null",table_name: str = "null", fil_condition: str = '1=1', limit: int = 10, start: str = None, end: str = None):
     # Check if the database is SQL Server
     # log all the inputs to the function
-    logging.info(f"Received request for /data with database: {database}, table_name: {table_name}, fil_condition: {fil_condition}, limit: {limit}, start: {start}, end: {end}")
+    global db_connections
+    global postgres_server_con
+
+    logging.info(f"Received request for /data with database: {database},  table_name: {table_name}, fil_condition: {fil_condition}, limit: {limit}, start: {start}, end: {end}")
     if start is None or end is None:
         logging.error("No start or end date provided")
         return {"error": "No start or end date provided"}
@@ -195,29 +206,40 @@ async def get_data(database: str = "null", table_name: str = "null", fil_conditi
     except ValueError as e:
         logging.error(f"Date format error: {e}")
         return {"error": "Invalid date format"}
-    if database == 'sql_server':
+    
+    # database sent will be 
+
+    # get the connection object from the db_connections dictionary
+    # we will use the connection object created globally
+    connection_obj = db_connections.get(database)
+    if connection_obj is None:
+        logging.error(f"Connection to {database} failed.")
+        return {"error": f"Connection to {database} failed."}
+    
+    if "server" in database.lower():
+
         if table_name:
             date_filter = ""
             if start and end:
                 date_filter = f" time BETWEEN '{start_date}' AND '{end_date}'"
             query = f"SELECT * from {table_name} WHERE {date_filter}"
             logging.info(f"Executing SQL Server query: {query}")
-            result = await sql_server(query)
+            result = await db_query(query, connection_obj)
             redis_db_key = send_to_redis(result)
             # we need to send to postgres server db to store key id etc 
             store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
-    # Check if the database is PostgreSQL
-    elif database == 'postgres':
+    # Check if the database contains 'postgres'
+    elif 'postgres' in database.lower():
         if table_name:
             date_filter = ""
             if start and end:
                 date_filter = f" AND {table_name}.datetime BETWEEN '{start}' AND '{end}'"
             query = f"SELECT * from {table_name} WHERE {fil_condition}{date_filter}"
             logging.info(f"Executing PostgreSQL query: {query}")
-            result = await postgres(query)
+            result = await db_query(query, connection_obj)
             redis_db_key = send_to_redis(result)
             store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}
@@ -304,33 +326,20 @@ def store_query_data(key, qry, query_table, query_db):
 
     
 # Function to query SQL Server database
-async def sql_server(query):
+async def db_query(query, con_obj):
     # Test SQL Server connection
     # we want to use the connection object created globally 
     logging.info(f"Received request for /sql_server")
-    if sqls_con.conn is None:
-        if sqls_con.con_err:
-            return sqls_con.con_err
+    if con_obj.conn is None:
+        if con_obj.con_err:
+            return con_obj.con_err
         else:
             return {"error": "SQL Server connection not established"}
-    result = await asyncio.to_thread(sqls_con.query, query)
+    result = await asyncio.to_thread(con_obj.query, query)
 
     return result
 
 # Function to query PostgreSQL database
-async def postgres(query):
-
-    logging.info(f"Received request for /postgres")
-    if postgres_con.conn is None:
-        if postgres_con.con_err:
-            return postgres_con.con_err
-        else:
-            return {"error": "Postgres connection not established"}
-    
-    result = await asyncio.to_thread(postgres_con.query, query)
-
-
-    return result
 
 
 # function to send to redis

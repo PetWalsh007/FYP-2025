@@ -46,15 +46,32 @@ def save_config(config_data):
 def load_config_call():
     global config
     config = load_config()
-     
-load_config_call()
+
+
+def app_startup_routine():
+    logging.info("App started")
+    
+
+
+
 
 
 
 # routes pathname added for testing 
-app = dash.Dash(__name__, requests_pathname_prefix='/dash/')
-app.title = 'RTA MES'
-server = app.server  # Expose the Flask server for Gunicorn
+try:
+    app = dash.Dash(__name__, requests_pathname_prefix='/dash/')
+    app.title = 'RTA MES'
+    server = app.server  # Expose the Flask server for Gunicorn
+
+except Exception as e:
+    logging.error(f"Error initializing Dash app: {e}")
+    
+
+
+app_startup_routine()  # Call the startup routine to load the config and log the startup
+     
+load_config_call()
+
 
 
 
@@ -462,7 +479,8 @@ def get_style(data):
      Input('table_name', 'value'),
      Input("btn_csv", "n_clicks"),
      Input("config-button", "n_clicks"),
-     Input('url', 'pathname')],
+     Input('url', 'pathname'),
+     Input('analysis-type', 'value')],
     [State('store', 'data'),
      State('redis-key-store', 'data'),
      State('redis-key-entry', 'value'),
@@ -472,7 +490,7 @@ def get_style(data):
     prevent_initial_call=True
 )
 def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_btn, st_date, end_date, process_btn,
-                  data_pt, db_sel, tbl_sel, download_cts, config_button, pathname,
+                  data_pt, db_sel, tbl_sel, download_cts, config_button, pathname, analysis_type,
                   store_data, redis_key_store, manual_key_entry, processed_key_store, manual_processed_key_entry, to_process_key):
 
     # fix for none type issue
@@ -623,7 +641,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
     if button_id == 'process-data' and process_btn > 0:
         logging.info(f"Processing Data - Code")
         try:
-            data = send_data_for_processing(to_process_key)
+            data = send_data_for_processing(to_process_key, analysis_type)  # Calls backend
             logging.info(f"Processing Data - Redis Key: {to_process_key}")
             redis_key = data.get("redis_key")
             logging.info(f"Processing Data - Redis Key: {redis_key}")
@@ -763,7 +781,7 @@ def get_data_all(pts, db_sel, tbl_sel, st_date, end_date):
     #database_table_sel = config['databases'][db_sel]['database']['table']
     endpoint_ip = config['endpoints']['abstraction']['ip']
     endpoint_port = config['endpoints']['abstraction']['port']
-    
+    logging.info(f"Fetching data from {endpoint_ip}:{endpoint_port}")
     response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}&start={st_date}&end={end_date}') # updated to take the table name from the dropdown
     response_json = response.json()
     # send response to redis first 
@@ -783,7 +801,7 @@ def get_data_all(pts, db_sel, tbl_sel, st_date, end_date):
         return response_json
 
 
-def send_data_for_processing(redis_key_proc):
+def send_data_for_processing(redis_key_proc, analysis_typ):
     # This function will send data to the appropriate LxCT for processing
 
     endpoint_ip = config['endpoints']['backend']['ip']
@@ -792,7 +810,7 @@ def send_data_for_processing(redis_key_proc):
 
 
     
-    url = f'http://{endpoint_ip}:{endpoint_port}/process_data?operation=stats&redis_key={redis_key_proc}'  
+    url = f'http://{endpoint_ip}:{endpoint_port}/process_data?operation={analysis_typ}&redis_key={redis_key_proc}'  
     response_json = requests.post(url)
     logging.info(f"Response Rec: {response_json}")
     return response_json.json()
