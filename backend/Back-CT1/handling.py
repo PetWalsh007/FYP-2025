@@ -39,14 +39,18 @@ logger.info("Starting FastAPI lifespan function...")
 
 redis_host ='192.168.1.83'
 redis_port = 6379
+redis_client = None 
 
-try:
-    redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
-    redis_client.ping()
-    logger.info("Connected to Redis server successfully.")
-except rd.ConnectionError as e:
-    logger.error(f"Redis connection error: {e}")
 
+
+def app_startup_routine():
+    global redis_client
+    try:
+        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+        redis_client.ping()
+        logger.info("Connected to Redis server successfully.")
+    except rd.ConnectionError as e:
+        logger.error(f"Redis connection error: {e}")
 
 
 @asynccontextmanager
@@ -54,6 +58,8 @@ async def lifespan(app: FastAPI):
     # Define Startup tasks
     logger.info("------------------------------")  # Log separator
     logger.info("Starting up handling.py...")  # Log startup event
+
+    app_startup_routine()
     
     yield
     # Define Shutdown tasks

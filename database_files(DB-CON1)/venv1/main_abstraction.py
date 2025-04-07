@@ -51,9 +51,10 @@ def app_startup_routine():
         except Exception as e:
             logging.error(f"Error While starting connection to backend database server: {e}")
             postgres_server_con = None
-        time.sleep((5*attempt)+3)
-        attempt += 1
         wait_time = (5 * attempt) + 3
+        time.sleep(wait_time)
+        attempt += 1
+        
         logging.info(f"Retrying in {wait_time}s... (Attempt {attempt}/{max_attempts})")
         time.sleep(wait_time)
 
