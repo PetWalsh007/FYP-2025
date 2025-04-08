@@ -220,7 +220,7 @@ def main_page_layout():
         # 
 
         html.Div([
-           html.Div([html.Label("Stored Redis Keys from this Session:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
+           html.Div([html.Label("Stored Raw Data Keys from this Session:", style={'fontSize': '18px', 'fontWeight': 'bold'}),
                      html.Div(id="available-keys-container", style={'marginBottom': '10px', 'textAlign': 'center', 'display': 'grid', 'gap': '10px'}),
 
 
@@ -230,7 +230,7 @@ def main_page_layout():
                     html.Button("Retrieve Data from Redis", id="fetch-from-redis-button", n_clicks=0, className='button', style=button_style),
 
                     # Hidden store to keep track of Redis keys
-                    dcc.Store(id='redis-key-store', data=[]),
+                    dcc.Store(id='redis-key-store', data=[], storage_type='session'),  
                     ],style={'flex': '1', 'marginTop': '20px', 'textAlign': 'left', 'padding': '20px', 'border': '1px solid #ccc', 'borderRadius': '5px', 'backgroundColor': '#ededed  '}),
 
             html.Div([
@@ -243,7 +243,7 @@ def main_page_layout():
                     html.Button("Retrieve Processed Data from Redis", id="fetch-processed-from-redis-button", n_clicks=0, className='button', style=button_style),
 
                     # Hidden store to keep track of Processed Data Redis keys
-                    dcc.Store(id='processed-key-store', data=[]),
+                    dcc.Store(id='processed-key-store', data=[], storage_type='session'),
                     ], style={'flex': '1', 'marginTop': '20px', 'textAlign': 'left', 'padding': '20px', 'border': '1px solid #ccc', 'borderRadius': '5px', 'backgroundColor': '#ededed '}),
 
                 ], style={'display': 'flex', 'gap': '20px'}),
@@ -287,7 +287,7 @@ def main_page_layout():
                                         page_size=50  
                                         )
                 ], style={'marginTop': '20px'}),
-        dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}),  # Store to keep track of click counts
+        dcc.Store(id='store', data={'get_data_clicks': 0, 'get_all_data_clicks': 0, 'onscreen_data':[]}, storage_type='session'),  # Store to keep track of click counts // onscreen data
     ])
 
 
@@ -533,15 +533,22 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
         logging.info(f"Fetching Redis Key - Data Points: {data_pt}, DB: {db_sel}, Table: {tbl_sel}, Start Date: {st_date}, End Date: {end_date}")
         response_json = get_data_all(data_pt, db_sel, tbl_sel, st_date, end_date)  # Calls backend
         redis_key = response_json.get("redis_key")
-
+        db_sel_lbl = next(
+                                (item['label'] for item in config['database_options'] if item['value'] == db_sel),
+                                None  
+                            )
+        if db_sel_lbl:
+            redis_key_display = f"{redis_key} - {db_sel_lbl} - {tbl_sel} - {st_date} - {end_date}"
+        else:
+            redis_key_display = f"{redis_key} - {tbl_sel} - {st_date} - {end_date}"
         if redis_key:
             if not redis_key_store:
                 redis_key_store = []
-            redis_key_store.append(redis_key)
+            redis_key_store.append(redis_key_display)
             return(
-                f"Data requested. Redis Key: {redis_key}",[], [], store_data, 
+                f"Data requested. Redis Key: {redis_key}",dash.no_update, dash.no_update, store_data, 
                 redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
-                dash.no_update, dash.no_update, [], []
+                dash.no_update, dash.no_update, dash.no_update,dash.no_update
             )
 
         return ("Failed to retrieve data.", [], [], store_data, 
@@ -551,6 +558,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
     # Updated to now only fetch the data from Redis when a user clicks the retrieve data from redis button 
     if button_id == 'fetch-from-redis-button' :
         redis_key = manual_key_entry or (redis_key_store[-1] if redis_key_store else None)
+        redis_key = redis_key.split(' - ')[0] if redis_key else None
         if redis_key:
             try:
                 # Fetch data from Redis using the key if exists
@@ -582,12 +590,14 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
                 return (
                     f"Error retrieving data from Redis: {e}", [], [], store_data,
                     redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
-                    dash.no_update, dash.no_update, [], []
+                    dash.no_update, dash.no_update, dash.no_update, dash.no_update
                 ) 
 
     # Used to fetch the processed data from redis using a key - same conecpt as above
     if button_id == 'fetch-processed-from-redis-button':
         redis_key = manual_processed_key_entry or (processed_key_store[-1] if processed_key_store else None)
+        # keys is of the form <redis_key> - <analysis_type> so we need to split the key to get the redis key only no space and remove the analysis 
+        redis_key = redis_key.split(' - ')[0] if redis_key else None
         if redis_key:
             try:
                 logging.info(f"Fetching Redis Key - Processed Data: {redis_key}")
@@ -613,7 +623,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
                 return (
                     f"Error retrieving data from Redis: {e}", [], [], store_data,
                     redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, html.Ul([html.Li(key) for key in processed_key_store]), 
-                    dash.no_update, dash.no_update, [], []
+                    dash.no_update, dash.no_update, dash.no_update, dash.no_update
                 )
         pass 
 
@@ -648,16 +658,25 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
             if redis_key:
                 if not processed_key_store:
                     processed_key_store = []
-                processed_key_store.append(redis_key)
+                    
+                analysis_type_lbl = next(
+                                        (item['label'] for item in config['analytics'] if item['value'] == analysis_type),
+                                        None  
+                                    )
+                if analysis_type_lbl:
+                    appended_key_str = f"{redis_key} - {analysis_type_lbl}"
+                else:
+                    appended_key_str = redis_key
+                processed_key_store.append(appended_key_str)
                 return(
-                    f"Data processed. Redis Key: {redis_key}",[], [], store_data, 
+                    f"Data processed. Redis Key: {redis_key}",dash.no_update, dash.no_update, store_data, 
                     dash.no_update, dash.no_update, processed_key_store, html.Ul([html.Li(key) for key in processed_key_store]),
-                    dash.no_update, dash.no_update, [], []
+                    dash.no_update, dash.no_update, dash.no_update, dash.no_update
                 )
 
             return ("Failed to process data.", [], [], store_data, 
                     dash.no_update, dash.no_update, processed_key_store, html.Ul([html.Li(key) for key in processed_key_store]),
-                    dash.no_update, dash.no_update, [], [])
+                    dash.no_update, dash.no_update, dash.no_update, dash.no_update)
         except Exception as e:
             logging.error(f"Error processing data: {e}")
             return (f"Error processing data: {e}", [], [], store_data, 
@@ -681,9 +700,9 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
         store_data["onscreen_data"],  # Table Data
         store_data,  # Store Data for visualization
         redis_key_store,
-        dash.no_update,  # Redis keys
-        dash.no_update,  # Processed keys
-        dash.no_update,  # Processed keys container
+        html.Ul([html.Li(key) for key in redis_key_store]),  # Redis keys
+        processed_key_store,  # Processed keys
+        html.Ul([html.Li(key) for key in processed_key_store]),  # Processed keys container
         dash.no_update,
         dash.no_update,
         column_options,  # Populate X-axis dropdown
