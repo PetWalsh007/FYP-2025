@@ -19,26 +19,26 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 
-def daily_average(dataframe, info):
-    logger.info("Starting  function")
-    # take time series data nad compute the daily average over the number of days in the datapoints
 
-    # Check if the DataFrame has a 'timestamp' column
+logger.info("Starting  function")
+# take time series data nad compute the daily average over the number of days in the datapoints
 
-    """
-        return {
-            "status": "ok",
-            "shape": df.shape,
-            "columns": data_column_info,
-            "is_time_data": is_time_data,
-            "time_columns_position": time_columns,
-            "total_numeric_cols": len([col for col in data_column_info if col['is_numeric']]) or None,
-        }, df
-    
-    
-    """
-    # Function accepts a dataframe and a dictionary with information about the data
-    # Returns a new dataframe with differnt infomation that can be displayed in the front end
+# Check if the DataFrame has a 'timestamp' column
+
+"""
+    return {
+        "status": "ok",
+        "shape": df.shape,
+        "columns": data_column_info,
+        "is_time_data": is_time_data,
+        "time_columns_position": time_columns,
+        "total_numeric_cols": len([col for col in data_column_info if col['is_numeric']]) or None,
+    }, df
+
+
+"""
+# Function accepts a dataframe and a dictionary with information about the data
+# Returns a new dataframe with differnt infomation that can be displayed in the front end
    
 def daily_average(dataframe, info):
     logger.info("Starting daily_average function")

@@ -93,12 +93,67 @@ async def rec_req(redis_key: str = None):
 
 # process the data 
 @app.post("/process_data")
-def process_data(redis_key: str = None, operation: str = None):
+def process_data(redis_key: str = None, operation: str = None, dual: bool = False):
     """
     Function to process the data that has been passed in the request
     """
 
     logger.info(f"Processing data for redis key: {redis_key}")
+
+    logger.info(f"Operation requested: {operation}")
+    logger.info(f"Dual processing requested: {dual}")
+    # check if key is not none 
+    if redis_key is None:
+        logger.error(f"Redis key is None")
+        return {"error": "Redis key is None"}
+    
+    #check if dual is true
+    if operation == "DTW_analysis":
+        if dual == True:
+            try:
+                # split the redis key into two keys
+                logger.info(f"Dual processing requested")
+                redis_key_1 = redis_key.split(",")[0]
+                redis_key_2 = redis_key.split(",")[1]
+
+                logger.info(f"Redis key 1: {redis_key_1}")
+                logger.info(f"Redis key 2: {redis_key_2}")
+                # get the data from the redis store
+                op_data_1 = get_redis_data(redis_key_1)
+                op_data_2 = get_redis_data(redis_key_2)
+
+                data_info_1, df1 = processing.configure_data(op_data_1)
+                data_info_2, df2 = processing.configure_data(op_data_2)
+
+                updated_data_df = dtw.dtw_custom(df1, data_info_1, df2, data_info_2)
+                if updated_data_df is None:
+                    logger.error("Error in DTW processing")
+                    return {"error": "Error in DTW processing"}
+                proc_key = send_processed_data_to_redis(updated_data_df)
+                try:
+                    val = send_data_to_server_db( proc_key, redis_key, operation, flag=1)
+                    try: 
+                        if "error" in val:
+                            logger.error(f"Error sending data to server: {val['error']}")
+                            return {"error": val["error"]}
+                        else:
+                            logger.info(f"Data sent to server successfully: {val}")
+                    except Exception as e:
+                        logger.error(f"Error processing server response: {str(e)}")
+                        return {"error": "Failed to process server response"}
+                except Exception as e:
+                    logger.error(f"Error sending data to server: {str(e)}")
+                    return {"error": "Failed to send data to server"}
+
+                return {"redis_key": proc_key}
+
+
+            except Exception as e:
+                logger.error(f"Error processing dual keys: {str(e)}")
+                return {"error": f"Failed to process dual keys - {str(e)}"}
+            
+        
+
 
     op_data = get_redis_data(redis_key)
 
@@ -110,6 +165,9 @@ def process_data(redis_key: str = None, operation: str = None):
     data_info, df = processing.configure_data(op_data)
     # strip data_info of the dataframe
     logger.info(f"Data info: {data_info}")
+
+
+
     # W.I.P - 
 
     # After getting the data info, we need a pipeline to make decisions on what to do with the data - specifically time series vs non time series data
@@ -243,7 +301,10 @@ def send_processed_data_to_redis(data):
         logger.info(f"Converting data to JSON...")
         
         # Generate a unique key for the processed data
-        redis_key = f"processed_data:{random.randint(1, 10000)}"
+        key_num = random.randint(1, 10000)
+        key_str = random.choice(['a', 'b', 'c', 'd', 'e'])
+        key = f"processed_data:{key_num}{key_str}"
+        redis_key = key
         logger.info(f"Generated Redis key: {redis_key}")
         # Store the processed data in Redis
         redis_client.set(redis_key, json.dumps(data, default=json_serial), ex=7200)  # TTL to 2 hours

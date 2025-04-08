@@ -115,6 +115,14 @@ while index < 2:
 
     end_time = time()
 
+
+
+
+
+
+
+    """   
+
     print("Time taken: ", end_time - start_time)
     time_list.append(end_time - start_time)
     #points_list.append(POINTS)
@@ -138,3 +146,4 @@ while index < 2:
     plt.tight_layout()
     plt.show()
     index += 1
+    """
