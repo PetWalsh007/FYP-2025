@@ -827,9 +827,14 @@ def send_data_for_processing(redis_key_proc, analysis_typ):
     endpoint_port = config['endpoints']['backend']['port']
     logging.info(f"Sending data for processing to {endpoint_ip}:{endpoint_port}")
 
-
+    dual_key = False
+    # check to see if the redis key is sent as two keys, separated by a ','
+    if ',' in redis_key_proc:
+        logging.info(f"Redis key is a dual key: {redis_key_proc}")
+        dual_key = True
     
-    url = f'http://{endpoint_ip}:{endpoint_port}/process_data?operation={analysis_typ}&redis_key={redis_key_proc}'  
+    url = f'http://{endpoint_ip}:{endpoint_port}/process_data?operation={analysis_typ}&redis_key={redis_key_proc}&dual={dual_key}'  
+    logging.info(f"Sending data for processing to {url}")
     response_json = requests.post(url)
     logging.info(f"Response Rec: {response_json}")
     return response_json.json()
