@@ -530,6 +530,10 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
 
     #  Retrieve and Store redis key
     if button_id == 'get-all-data-button' and get_data_btn > 0:
+        if db_sel is None or tbl_sel is None or st_date is None or end_date is None:
+            return ("Please Ensure a database, table, and date range are selected.", dash.no_update, dash.no_update, store_data, 
+                    redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
+                    dash.no_update, dash.no_update, dash.no_update, dash.no_update)
         logging.info(f"Fetching Redis Key - Data Points: {data_pt}, DB: {db_sel}, Table: {tbl_sel}, Start Date: {st_date}, End Date: {end_date}")
         response_json = get_data_all(data_pt, db_sel, tbl_sel, st_date, end_date)  # Calls backend
         redis_key = response_json.get("redis_key")
@@ -568,7 +572,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
                 else:
                     logging.info(f"Redis key {redis_key} does not exist")
                     return (
-                        f"Redis key {redis_key} does not exist", [], [], store_data,
+                        f"Redis key {redis_key} does not exist", dash.no_update, dash.no_update, store_data,
                         redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
                         dash.no_update, dash.no_update, [], []
                     )
@@ -588,7 +592,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
             except Exception as e:
                 logging.error(f"Redis Raw Data Fetch Error: {e}")
                 return (
-                    f"Error retrieving data from Redis: {e}", [], [], store_data,
+                    f"Error retrieving data from Redis: {e}", dash.no_update, dash.no_update, store_data,
                     redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
                     dash.no_update, dash.no_update, dash.no_update, dash.no_update
                 ) 
@@ -650,11 +654,18 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
     # Process Data for Analysis
     if button_id == 'process-data' and process_btn > 0:
         logging.info(f"Processing Data - Code")
+
+        if to_process_key is None:
+            return (f"Please enter a Redis key to process data.", dash.no_update, dash.no_update, store_data, 
+                    redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
+                    dash.no_update, dash.no_update, dash.no_update, dash.no_update)
         try:
             data = send_data_for_processing(to_process_key, analysis_type)  # Calls backend
             logging.info(f"Processing Data - Redis Key: {to_process_key}")
             redis_key = data.get("redis_key")
-            logging.info(f"Processing Data - Redis Key: {redis_key}")
+            logging.info(f"Processing Data - Redis Key Returned: {redis_key}")
+            if not redis_key:
+                error_message = data.get("error")
             if redis_key:
                 if not processed_key_store:
                     processed_key_store = []
@@ -674,7 +685,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
                     dash.no_update, dash.no_update, dash.no_update, dash.no_update
                 )
 
-            return ("Failed to process data.", [], [], store_data, 
+            return (f"Failed To Process Data Dash Error Catch - No Key Returned From Server - Error: {error_message}.", [], [], store_data, 
                     dash.no_update, dash.no_update, processed_key_store, html.Ul([html.Li(key) for key in processed_key_store]),
                     dash.no_update, dash.no_update, dash.no_update, dash.no_update)
         except Exception as e:
@@ -828,7 +839,9 @@ def send_data_for_processing(redis_key_proc, analysis_typ):
     logging.info(f"Sending data for processing to {endpoint_ip}:{endpoint_port}")
 
     dual_key = False
+    # strip the redis key to remove any spaces or whitespace
     # check to see if the redis key is sent as two keys, separated by a ','
+    redis_key_proc = redis_key_proc.strip()
     if ',' in redis_key_proc:
         logging.info(f"Redis key is a dual key: {redis_key_proc}")
         dual_key = True

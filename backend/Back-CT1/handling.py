@@ -156,7 +156,16 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
 
 
     op_data = get_redis_data(redis_key)
-
+    # if  return {"error": "Redis key not found"} is returned, then we need to handle this error and return a message to the user
+    # log type returned 
+    logger.info(f"Data type returned: {type(op_data)}")
+    
+    if isinstance(op_data, dict) and "error" in op_data:
+        logger.error(f"Error retrieving data from Redis: {op_data['error']}")
+        return {"error": op_data["error"]}
+    else:
+        logger.info(f"Data retrieved from Redis: Available")
+    
 
     # begin processing the data
    
