@@ -153,8 +153,8 @@ app.layout = html.Div([
     dcc.Download(id="download-dataframe-csv"),  # _self used to trigger full page reload 
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content'),
-    html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
-    dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
+    #html.Label('X Number of data points to display:', style={'fontSize': '18px', 'marginRight': '10px'}),
+    #dcc.Input(id='data-points', type='number', value=10, style={'fontSize': '18px', 'width': '100px'}),
 ], style={'fontFamily': 'Times New Roman', 'padding': '40px'})
 
 
@@ -315,7 +315,10 @@ page2_layout = html.Div([
     html.Div(id='restart-confirmation', style={'marginTop': '20px'}),
     html.Div(id='restart-dbs-confirmation', style={'marginTop': '20px'}),
     html.Div(id='save-confirmation', style={'marginTop': '20px'}),
-    html.A('Go back to main page Dash', href='/dash/')
+    html.A(
+    html.Button('Go back to main page Dash', style={'fontSize': '16px', 'padding': '10px 20px'}),
+    href='/dash/',
+    target='_self')
     
 ])
 
@@ -344,7 +347,10 @@ def restart_server_dbs(submit_n_clicks):
         endpoint_port = config['endpoints']['abstraction']['port']
         response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/command?rst=restart_server_main_abstraction')
         time.sleep(2) # for a wait time to allow the server to restart
-        return response.text
+        # extract message from response
+        if response.status_code == 200:
+            message = response.json().get('message', 'No message returned')
+            return f"Message From Server: {message}"
     return ''
 
 
@@ -409,6 +415,8 @@ def display_page(pathname):
     return main_page_layout()
 
 
+# Deprecated - This callback is used to update the colour of the store labels based on the data in the stores - no longer used
+"""
 
 @app.callback(
     [Output("store-1-label", "style"),
@@ -448,7 +456,7 @@ def get_style(data):
     except Exception as e:
         logging.error(f"Error in get_style: {e}")
         return  {'color': 'blue', 'fontWeight': 'normal', 'backgroundColor': '#FFBABA', 'padding': '3px 6px', 'borderRadius': '5px'}
-     
+"""     
 
 
 
@@ -474,7 +482,7 @@ def get_style(data):
      Input('data-date-range', 'start_date'),
      Input('data-date-range', 'end_date'),
      Input('process-data', 'n_clicks'),
-     Input('data-points', 'value'),
+     #Input('data-points', 'value'),
      Input('database', 'value'),
      Input('table_name', 'value'),
      Input("btn_csv", "n_clicks"),
@@ -490,7 +498,7 @@ def get_style(data):
     prevent_initial_call=True
 )
 def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_btn, st_date, end_date, process_btn,
-                  data_pt, db_sel, tbl_sel, download_cts, config_button, pathname, analysis_type,
+                   db_sel, tbl_sel, download_cts, config_button, pathname, analysis_type,
                   store_data, redis_key_store, manual_key_entry, processed_key_store, manual_processed_key_entry, to_process_key):
 
     # fix for none type issue
@@ -534,8 +542,8 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
             return ("Please Ensure a database, table, and date range are selected.", dash.no_update, dash.no_update, store_data, 
                     redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
                     dash.no_update, dash.no_update, dash.no_update, dash.no_update)
-        logging.info(f"Fetching Redis Key - Data Points: {data_pt}, DB: {db_sel}, Table: {tbl_sel}, Start Date: {st_date}, End Date: {end_date}")
-        response_json = get_data_all(data_pt, db_sel, tbl_sel, st_date, end_date)  # Calls backend
+        logging.info(f"Fetching Redis Key -  DB: {db_sel}, Table: {tbl_sel}, Start Date: {st_date}, End Date: {end_date}")
+        response_json = get_data_all( db_sel, tbl_sel, st_date, end_date)  # Calls backend
         redis_key = response_json.get("redis_key")
         db_sel_lbl = next(
                                 (item['label'] for item in config['database_options'] if item['value'] == db_sel),
@@ -804,7 +812,7 @@ def get_data(n_clicks, redis_key_proc):
     
     return response
 
-def get_data_all(pts, db_sel, tbl_sel, st_date, end_date):
+def get_data_all(db_sel, tbl_sel, st_date, end_date):
     
     #using config file to get the table name
   
@@ -812,7 +820,7 @@ def get_data_all(pts, db_sel, tbl_sel, st_date, end_date):
     endpoint_ip = config['endpoints']['abstraction']['ip']
     endpoint_port = config['endpoints']['abstraction']['port']
     logging.info(f"Fetching data from {endpoint_ip}:{endpoint_port}")
-    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&limit={pts}&start={st_date}&end={end_date}') # updated to take the table name from the dropdown
+    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&start={st_date}&end={end_date}') # updated to take the table name from the dropdown
     response_json = response.json()
     # send response to redis first 
     logging.info(f"Response Rec: {response_json}")
