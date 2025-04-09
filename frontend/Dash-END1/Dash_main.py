@@ -50,6 +50,8 @@ def load_config_call():
 
 def app_startup_routine():
     logging.info("App started")
+
+    # to add call to backend to update the config file if needed on start up - this is a placeholder for now
     
 
 
