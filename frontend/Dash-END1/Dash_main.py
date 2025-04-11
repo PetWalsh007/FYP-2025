@@ -324,7 +324,57 @@ page2_layout = html.Div([
     
 ])
 
+
+# dev page for adding new databases to postgres - palceholder
+
+#  - endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, connection_uname, connection_password, metadata (defualt {time_col_name:"time"}), is_active defualt true
+
+page_3_layout = html.Div([
+    html.H1("Update Database Configuration", style={'textAlign': 'center'}),
+
+    html.Label("Endpoint Name:", style={'fontSize': '16px'}),
+    dcc.Input(id='endpoint-name', type='text', placeholder="Enter endpoint name", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Endpoint Type:", style={'fontSize': '16px'}),
+    dcc.Input(id='endpoint-type', type='text', placeholder="Enter endpoint type (e.g., PostgreSQL)", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Endpoint IP:", style={'fontSize': '16px'}),
+    dcc.Input(id='endpoint-ip', type='text', placeholder="Enter endpoint IP", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Endpoint Port:", style={'fontSize': '16px'}),
+    dcc.Input(id='endpoint-port', type='number', placeholder="Enter endpoint port", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Driver Name:", style={'fontSize': '16px'}),
+    dcc.Input(id='driver-name', type='text', placeholder="Enter driver name", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Connection Username:", style={'fontSize': '16px'}),
+    dcc.Input(id='connection-uname', type='text', placeholder="Enter connection username", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Connection Password:", style={'fontSize': '16px'}),
+    dcc.Input(id='connection-password', type='password', placeholder="Enter connection password", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Metadata (default: {time_col_name: 'time'}):", style={'fontSize': '16px'}),
+    dcc.Input(id='metadata', type='text', placeholder="Enter metadata (JSON format)", value='{"time_col_name": "time"}', style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Is Active (default: true):", style={'fontSize': '16px'}),
+    dcc.Dropdown(
+        id='is-active',
+        options=[
+            {'label': 'True', 'value': True},
+            {'label': 'False', 'value': False},
+        ],
+        value=True,
+        style={'marginBottom': '10px', 'width': '100%'}
+    ),
+
+    html.Button('Update Database', id='update-db-button', n_clicks=0, style={'marginTop': '20px', 'fontSize': '16px', 'padding': '10px 20px'}),
+    html.Div(id='update-db-confirmation', style={'marginTop': '20px', 'fontSize': '16px', 'color': 'green'}),
+])
+
 # https://dash.plotly.com/dash-core-components/confirmdialog for more information on the ConfirmDialog component
+
+
+
 
 
 
