@@ -151,7 +151,8 @@ app.layout = html.Div([
     html.A(html.Button("Go to Home Page", className='Button', style=button_style2), href="/", target="_self"),
     html.Button('Clear', id='clear-screen-button', n_clicks=0, className='button', style=button_style2),
     html.Button("Download CSV", id="btn_csv", className='button', style=button_style2),
-    html.Button("Config", id="config-button", n_clicks=0, className='button', style={**button_style2, 'marginRight': '0px'}),
+    html.Button("Config", id="config-button", n_clicks=0, className='button', style=button_style2),
+    html.Button('Add Database', id='Add_db', className='button',style=button_style2),
     dcc.Download(id="download-dataframe-csv"),  # _self used to trigger full page reload 
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content'),
@@ -330,7 +331,7 @@ page2_layout = html.Div([
 #  - endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, connection_uname, connection_password, metadata (defualt {time_col_name:"time"}), is_active defualt true
 
 page_3_layout = html.Div([
-    html.H1("Update Database Configuration", style={'textAlign': 'center'}),
+    html.H1("Add Database Configuration", style={'textAlign': 'center'}),
 
     html.Label("Endpoint Name:", style={'fontSize': '16px'}),
     dcc.Input(id='endpoint-name', type='text', placeholder="Enter endpoint name", style={'marginBottom': '10px', 'width': '100%'}),
@@ -367,9 +368,71 @@ page_3_layout = html.Div([
         style={'marginBottom': '10px', 'width': '100%'}
     ),
 
-    html.Button('Update Database', id='update-db-button', n_clicks=0, style={'marginTop': '20px', 'fontSize': '16px', 'padding': '10px 20px'}),
+    html.Button('Add Database', id='update-db-button', n_clicks=0, style={'marginTop': '20px', 'fontSize': '16px', 'padding': '10px 20px'}),
     html.Div(id='update-db-confirmation', style={'marginTop': '20px', 'fontSize': '16px', 'color': 'green'}),
-])
+    html.A( html.Button('Go back to main page Dash', style={'fontSize': '16px', 'padding': '10px 20px'}),
+    href='/dash/',
+    target='_self')
+    ]
+    )
+
+@app.callback(
+    Output('update-db-confirmation', 'children'),
+    [Input('update-db-button', 'n_clicks')],
+    [
+        State('endpoint-name', 'value'),
+        State('endpoint-type', 'value'),
+        State('endpoint-ip', 'value'),
+        State('endpoint-port', 'value'),
+        State('driver-name', 'value'),
+        State('connection-uname', 'value'),
+        State('connection-password', 'value'),
+        State('metadata', 'value'),
+        State('is-active', 'value'),
+    ]
+)
+def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, connection_uname, connection_password, metadata, is_active):
+    if n_clicks > 0:
+        try:
+            # Load the current config
+            ctx = dash.callback_context
+            button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+            # Update the database configuration
+            new_db_config = {
+                "endpoint_name": endpoint_name,
+                "endpoint_type": endpoint_type,
+                "endpoint_ip": endpoint_ip,
+                "endpoint_port": endpoint_port,
+                "driver_name": driver_name,
+                "connection_uname": connection_uname,
+                "connection_password": connection_password,
+                "metadata": json.loads(metadata),
+                "is_active": is_active,
+            }
+            
+            if button_id == 'update-db-button':
+                # send data here to endpoint to send to server db 
+                logging.info(f"Updating database configuration")
+                pass 
+
+            return f"Database '{endpoint_name}' updated successfully!"
+        except Exception as e:
+            logging.error(f"Error updating database: {e}")
+            return f"Error updating database: {e}"
+
+    return dash.no_update
+
+
+
+
+
+
+
+
+
+
+
 
 # https://dash.plotly.com/dash-core-components/confirmdialog for more information on the ConfirmDialog component
 
@@ -464,6 +527,8 @@ def update_config_textarea(pathname):
 def display_page(pathname):
     if pathname == '/dash/page2':
         return page2_layout
+    elif pathname == '/dash/page3':
+        return page_3_layout
     return main_page_layout()
 
 
@@ -539,6 +604,7 @@ def get_style(data):
      Input('table_name', 'value'),
      Input("btn_csv", "n_clicks"),
      Input("config-button", "n_clicks"),
+     Input('Add_db', 'n_clicks'),
      Input('url', 'pathname'),
      Input('analysis-type', 'value')],
     [State('store', 'data'),
@@ -550,7 +616,7 @@ def get_style(data):
     prevent_initial_call=True
 )
 def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_btn, st_date, end_date, process_btn,
-                   db_sel, tbl_sel, download_cts, config_button, pathname, analysis_type,
+                   db_sel, tbl_sel, download_cts, config_button, db_add_button ,pathname, analysis_type,
                   store_data, redis_key_store, manual_key_entry, processed_key_store, manual_processed_key_entry, to_process_key):
 
     # fix for none type issue
@@ -761,6 +827,12 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
         return (dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, 
                 dash.no_update, dash.no_update, dash.no_update, 
                 '/dash/page2', dash.no_update, dash.no_update, dash.no_update)
+    
+    if button_id == 'Add_db':
+        return (dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, 
+                dash.no_update, dash.no_update, dash.no_update, 
+                '/dash/page3', dash.no_update, dash.no_update, dash.no_update)
+
     # Update Graph menu
     column_options = [{"label": col, "value": col} for col in dataframe.columns]
     numeric_columns = [{"label": col, "value": col} for col in dataframe.select_dtypes(include="number").columns]
