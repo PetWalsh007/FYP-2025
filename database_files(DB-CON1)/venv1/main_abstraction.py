@@ -189,6 +189,34 @@ def json_serial(obj):
     raise TypeError(f"Type {type(obj)} not serializable")
 
 
+
+
+
+@app.post("/add_database_connection")
+async def add_database_connection(endpoint_name: str, endpoint_type: str, endpoint_ip: str, endpoint_port: int, driver_name: str, database_name: str, connection_uname: str, connection_pwd: str, is_active: bool = True):
+   
+    
+    if postgres_server_con.conn is None:
+        if postgres_server_con.con_err:
+            logging.error(f"Postgres Server connection error: {postgres_server_con.con_err}")
+            return postgres_server_con.con_err
+        else:
+            logging.error("Postgres Server connection not established")
+            return {"error": "SQL Server connection not established"}
+    
+    table = "Platform-Data.databases"
+    query = f"INSERT INTO {table} (endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, database_name, connection_uname, connection_pwd, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    values = (endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, database_name, connection_uname, connection_pwd, is_active)
+    try:
+        postgres_server_con.cursor.execute(query, values)
+        postgres_server_con.conn.commit()
+        logging.info(f"Query executed successfully: {query}")
+    except Exception as e:
+        logging.error(f"Error executing query: {e}")
+        return {"error": "Error executing query"}
+
+
+
 @app.get("/data")
 async def get_data(database: str = "null",table_name: str = "null", fil_condition: str = '1=1', limit: int = 10, start: str = None, end: str = None):
     # Check if the database is SQL Server
