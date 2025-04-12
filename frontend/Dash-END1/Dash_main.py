@@ -97,8 +97,14 @@ connect_redis()  # Connect to Redis server at the start of the app
 if redis_client is None:
     t=5
     logging.error("Failed to connect to Redis server. Retrying...")
-    time.sleep(t)
-    connect_redis()  # Retry connecting to Redis server
+    while t < 30:
+        time.sleep(t)
+        connect_redis()  # Retry connecting to Redis server
+        if redis_client:
+            logging.info("Connected to Redis server successfully after retry.")
+            break
+        t += 5
+        logging.error(f"Retrying to connect to Redis server {config['endpoints']['redis']['ip']}...")
     if redis_client is None:
         logging.error(f"Failed to connect to Redis server {config['endpoints']['redis']['ip']} after retrying....")
         raise ConnectionError("Could not connect to Redis server. Exiting...")
@@ -186,14 +192,16 @@ def main_page_layout():
             ),
             dcc.Dropdown(
                 id="table_name",
-                options=[
-                    {"label": f"{db_name.upper()} - {table}", "value": table}
-                    for db_name, db_info in config["databases"].items()
-                    for table in db_info["database"].get("tables", [])
+                options = [
+                    {"label": f"{db_info['label']} - {table}", "value": table}
+                    for db_info in config["database_options"]
+                    for table in db_info.get("tables", [])
                 ],
                 value=None,
                 placeholder="Select a Table",
-                style={'fontSize': '18px', 'width': '250px', 'marginRight': '10px'}
+                style={'fontSize': '18px', 'width': '400px',  'marginRight': '10px', 'whiteSpace': 'normal'    
+                }, # https://www.w3schools.com/cssref/pr_text_white-space.php
+
             ),
             dcc.DatePickerRange(
                 id='data-date-range',
