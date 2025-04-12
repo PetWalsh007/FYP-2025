@@ -417,9 +417,10 @@ def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoin
                 # send data here to endpoint to send to server db 
                 logging.info(f"Updating database configuration")
                 reply = send_data_to_server(new_db_config)  # Send data to server
+                
                 pass 
 
-            return f"{reply}"
+            return reply
         except Exception as e:
             logging.error(f"Error updating database: {e}")
             return f"Error updating database: {e}"
@@ -431,8 +432,9 @@ def send_data_to_server(data):
     # data is a dictionary containing the data to be sent to the server - can we the full dictionay to the backend for it to unpack 
     response = requests.post(f"http://{config['endpoints']['abstraction']['ip']}:{config['endpoints']['abstraction']['port']}/add_database_connection", json=data)
     logging.info(f"Sending data to server: {data}")
-    
-    return response.json()  # Return the response from the server
+    message = response.json().get('message', 'No message returned')
+    return f"Message From Server: {message}"
+
 
 
 
