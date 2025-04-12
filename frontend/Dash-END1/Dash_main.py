@@ -335,18 +335,18 @@ page_3_layout = html.Div([
 
     html.Label("Endpoint Name:", style={'fontSize': '16px'}),
     dcc.Input(id='endpoint-name', type='text', placeholder="Enter endpoint name", style={'marginBottom': '10px', 'width': '100%'}),
-
     html.Label("Endpoint Type:", style={'fontSize': '16px'}),
     dcc.Input(id='endpoint-type', type='text', placeholder="Enter endpoint type (e.g., PostgreSQL)", style={'marginBottom': '10px', 'width': '100%'}),
-
     html.Label("Endpoint IP:", style={'fontSize': '16px'}),
     dcc.Input(id='endpoint-ip', type='text', placeholder="Enter endpoint IP", style={'marginBottom': '10px', 'width': '100%'}),
-
     html.Label("Endpoint Port:", style={'fontSize': '16px'}),
     dcc.Input(id='endpoint-port', type='number', placeholder="Enter endpoint port", style={'marginBottom': '10px', 'width': '100%'}),
 
     html.Label("Driver Name:", style={'fontSize': '16px'}),
     dcc.Input(id='driver-name', type='text', placeholder="Enter driver name", style={'marginBottom': '10px', 'width': '100%'}),
+
+    html.Label("Database Name:", style={'fontSize': '16px'}),
+    dcc.Input(id='database-name', type='text', placeholder="Enter database name", style={'marginBottom': '10px', 'width': '100%'}),
 
     html.Label("Connection Username:", style={'fontSize': '16px'}),
     dcc.Input(id='connection-uname', type='text', placeholder="Enter connection username", style={'marginBottom': '10px', 'width': '100%'}),
@@ -385,13 +385,14 @@ page_3_layout = html.Div([
         State('endpoint-ip', 'value'),
         State('endpoint-port', 'value'),
         State('driver-name', 'value'),
+        State('database-name', 'value'),
         State('connection-uname', 'value'),
         State('connection-password', 'value'),
         State('metadata', 'value'),
         State('is-active', 'value'),
     ]
 )
-def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, connection_uname, connection_password, metadata, is_active):
+def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, db_name ,connection_uname, connection_password, metadata, is_active):
     if n_clicks > 0:
         try:
             # Load the current config
@@ -405,6 +406,7 @@ def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoin
                 "endpoint_ip": endpoint_ip,
                 "endpoint_port": endpoint_port,
                 "driver_name": driver_name,
+                "database_name": endpoint_name,
                 "connection_uname": connection_uname,
                 "connection_password": connection_password,
                 "metadata": json.loads(metadata),
@@ -414,15 +416,23 @@ def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoin
             if button_id == 'update-db-button':
                 # send data here to endpoint to send to server db 
                 logging.info(f"Updating database configuration")
+                reply = send_data_to_server(new_db_config)  # Send data to server
                 pass 
 
-            return f"Database '{endpoint_name}' updated successfully!"
+            return f"{reply}"
         except Exception as e:
             logging.error(f"Error updating database: {e}")
             return f"Error updating database: {e}"
 
     return dash.no_update
 
+
+def send_data_to_server(data):
+    # data is a dictionary containing the data to be sent to the server - can we the full dictionay to the backend for it to unpack 
+    response = requests.post(f"http://{config['endpoints']['abstraction']['ip']}:{config['endpoints']['abstraction']['port']}/add_database_connection", json=data)
+    logging.info(f"Sending data to server: {data}")
+    
+    return response.json()  # Return the response from the server
 
 
 

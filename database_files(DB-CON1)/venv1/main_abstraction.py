@@ -6,7 +6,7 @@ and passed to respective database connections
 
 '''
 from connections import connectcls_sql_server, connectcls_postgres
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 import subprocess
 import logging
 from contextlib import asynccontextmanager
@@ -191,29 +191,85 @@ def json_serial(obj):
 
 
 
-
 @app.post("/add_database_connection")
-async def add_database_connection(endpoint_name: str, endpoint_type: str, endpoint_ip: str, endpoint_port: int, driver_name: str, database_name: str, connection_uname: str, connection_pwd: str, is_active: bool = True):
-   
-    
-    if postgres_server_con.conn is None:
-        if postgres_server_con.con_err:
-            logging.error(f"Postgres Server connection error: {postgres_server_con.con_err}")
-            return postgres_server_con.con_err
-        else:
-            logging.error("Postgres Server connection not established")
-            return {"error": "SQL Server connection not established"}
-    
-    table = "Platform-Data.databases"
-    query = f"INSERT INTO {table} (endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, database_name, connection_uname, connection_pwd, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    values = (endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, database_name, connection_uname, connection_pwd, is_active)
+async def add_database_connection(request: Request):
+    """
+    Accepts a JSON payload to add a new database connection to the PostgreSQL server.
+    """
+    logging.info("Received request for /add_database_connection")
     try:
-        postgres_server_con.cursor.execute(query, values)
-        postgres_server_con.conn.commit()
-        logging.info(f"Query executed successfully: {query}")
+        
+        data = await request.json()
+        logging.info(f"Received data: {data}")
+        # Unpack the JSON data
+        endpoint_name = data.get("endpoint_name")
+        endpoint_type = data.get("endpoint_type")
+        endpoint_ip = data.get("endpoint_ip")
+        endpoint_port = data.get("endpoint_port")
+        driver_name = data.get("driver_name")
+        database_name = data.get("database_name")
+        connection_uname = data.get("connection_uname")
+        connection_pwd = data.get("connection_password")
+        metadata = data.get("metadata", {})
+        is_active = data.get("is_active", True)  
+
+        # Validate 
+        if not all([endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, database_name, connection_uname, connection_pwd]):
+            logging.error("Missing required fields in the JSON payload.")
+            return {"error": "Missing required fields in the JSON payload."}
+
+        # Check con
+        if postgres_server_con.conn is None:
+            if postgres_server_con.con_err:
+                logging.error(f"Postgres Server connection error: {postgres_server_con.con_err}")
+                return {"error": postgres_server_con.con_err}
+            else:
+                logging.error("Postgres Server connection not established")
+                return {"error": "Postgres Server connection not established"}
+
+        # https://stackoverflow.com/questions/26703476/how-to-perform-update-operations-on-columns-of-type-jsonb
+        # https://community.retool.com/t/updating-jsonb-column/19314
+        
+        query = """
+            INSERT INTO "Platform-Data".databases 
+            (endpoint_name, endpoint_type, endpoint_ip, endpoint_port, 
+            driver_name, database_name, connection_uname, connection_pwd, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        values = (endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, database_name, connection_uname, connection_pwd, is_active)
+        
+        # Update the metadata column
+        metadata_json = json.dumps(metadata) 
+        update_query = """
+            UPDATE "Platform-Data".databases 
+            SET metadata = ?::jsonb
+            WHERE endpoint_name = ?;
+        """
+        update_values = (metadata_json, endpoint_name)
+
+
+        try:
+            postgres_server_con.cursor.execute(query, values)
+            postgres_server_con.conn.commit()
+
+            logging.info(f"Query executed successfully: {query}")
+
+            postgres_server_con.cursor.execute(update_query, update_values)
+            postgres_server_con.conn.commit()
+            logging.info(f"Metadata updated successfully for endpoint: {endpoint_name}")
+     
+            logging.info(f"Database connection added successfully: {endpoint_name}")
+            return {"message": f"Database connection '{endpoint_name}' added successfully."}
+
+
+        except Exception as e:
+            logging.error(f"Error executing query: {e}")
+            return {"error": "Error executing query"}
+        
+
     except Exception as e:
-        logging.error(f"Error executing query: {e}")
-        return {"error": "Error executing query"}
+        logging.error(f"Error processing request: {e}")
+        return {"error": f"Error processing request {e}"}
 
 
 
