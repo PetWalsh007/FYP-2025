@@ -42,15 +42,36 @@ redis_port = 6379
 redis_client = None 
 
 
+def get_redis_client():
+    con_redis = None
+    try:
+        con_redis = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+        con_redis.ping()
+        logger.info("Connected to Redis server successfully.")
+        return con_redis
+    except rd.ConnectionError as e:
+        logger.error(f"Redis connection error: {e}")
+    return con_redis
+
 
 def app_startup_routine():
     global redis_client
-    try:
-        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
-        redis_client.ping()
-        logger.info("Connected to Redis server successfully.")
-    except rd.ConnectionError as e:
-        logger.error(f"Redis connection error: {e}")
+    redis_con_attempt = 0
+    redis_con_max_attempts = 5
+    while redis_client is None and redis_con_attempt < redis_con_max_attempts:
+        try:
+            redis_client = get_redis_client()
+            if redis_client is None:
+                logger.error("Failed to connect to Redis server.")
+                raise Exception("Redis connection failed")
+            if redis_client.ping():
+                logger.info("Redis client ping successful.")
+                logger.info("Redis client initialized successfully.")
+                break
+
+        except Exception as e:
+            logger.error(f"Error during app startup: {e}")
+        
 
 
 @asynccontextmanager
