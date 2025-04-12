@@ -181,6 +181,18 @@ async def lifespan(app):
 app = FastAPI(lifespan=lifespan)
 
 
+
+# adding health check to endpoints to help startups
+@app.get("/healthcheck")
+async def healthcheck():
+    #Health check endpoint to verify if the service is running.
+    
+    return {"status": "OK"}
+
+
+
+
+
 # https://stackoverflow.com/questions/10252010/serializing-class-instance-to-json 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""

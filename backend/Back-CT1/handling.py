@@ -2,7 +2,8 @@
 
 
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
+from routers import secure, public
 import subprocess
 import requests
 import pandas as pd
@@ -68,6 +69,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# adding health check to endpoints to help startups
+@app.get("/healthcheck")
+async def healthcheck():
+    """
+    Health check endpoint to verify if the service is running.
+    """
+    return {"status": "OK"}
 
 
 
@@ -151,6 +161,10 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
             except Exception as e:
                 logger.error(f"Error processing dual keys: {str(e)}")
                 return {"error": f"Failed to process dual keys - {str(e)}"}
+        else:
+            # dual is false - need dual to be true for DTW 
+            logger.error(f"Dual processing not requested for DTW analysis")
+            return {"error": "Dual Keys not sent for DTW analysis"}
             
         
 
@@ -194,7 +208,16 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
 
         # send data to redis store 
         logger.info(f"Sending processed data to Redis...")
-        proc_key = send_processed_data_to_redis(updated_data_df)
+        try:
+            proc_key = send_processed_data_to_redis(updated_data_df)
+            if "error" in proc_key:
+                logger.error(f"Error sending data to Redis: {proc_key['error']}")
+                return {"error": proc_key["error"]}
+            else:
+                logger.info(f"Data sent to Redis successfully: {proc_key}")
+        except Exception as e:
+            logger.error(f"Error sending data to Redis: {str(e)}")
+            return {"error": "Failed to send data to Redis"}
 
         try:
             val = send_data_to_server_db( proc_key, redis_key, operation, flag=1)
@@ -228,16 +251,15 @@ def send_data_to_server_db(proc_key: str, redis_key: str, operation: str, flag: 
         logger.info(f"Sending data to server with proc_key: {proc_key}, redis_key: {redis_key}, operation: {operation}, flag: {flag}")
         # Placeholder for actual implementation
         url = f"http://192.168.1.81:8000/store_processed_data?key_proc={proc_key}&key_raw={redis_key}&analysis_type={operation}&flag={flag}"  # Replace with actual server URL
-        response = requests.post(url)
+        try:
+            response = requests.post(url)
+            response.raise_for_status()  # raises errors ~400 and ~500
+            logger.info(f"Server response: {response.text}")  # Log the server's response content
+            return {"status": "success", "message": "Data sent to server successfully"}
+        except Exception as e:
+            logger.error(f"Error parsing server response: {str(e)}")
+            return {"error": "Failed to parse server response"}
         
-        if response.status_code != 200:
-            logger.error(f"Failed to send data to server. Status code: {response.status_code}, Response: {response.text}")
-            return {"error": "Failed to send data to server"}
-        
-
-
-        # Add logic to send data to the server database here
-        return {"status": "success", "message": "Data sent to server successfully"}
     except Exception as e:
         logger.error(f"Error in send_data_to_server_db: {str(e)}")
         return {"error": "Failed to send data to server"}
@@ -329,29 +351,7 @@ def send_processed_data_to_redis(data):
     pass
 
 
-def step_analysis_func():
-    """
-    Function to process the PLC step analysis requests
-    """
 
 
-    pass 
-
-
-
-def fuzzy_func():
-    """
-    Function to process the fuzzy logic requests
-    """
-
-    pass
-
-
-def dtw_func():
-    """
-    Function to process the DTW requests
-    """
-
-    pass
 
 
