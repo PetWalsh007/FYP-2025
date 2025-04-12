@@ -43,15 +43,41 @@ redis_port = 6379
 redis_client = None 
 
 
-
-def app_startup_routine():
-    global redis_client
+def get_redis_client():
+    """
+    Function to get the Redis client
+    """
+    con_redis = None
     try:
-        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
-        redis_client.ping()
-        logger.info("Connected to Redis server successfully.")
+        if redis_client is None:
+            con_redis = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+        return con_redis
     except rd.ConnectionError as e:
         logger.error(f"Redis connection error: {e}")
+        return None
+
+
+
+def app_startup_routine():
+
+    redis_rety_count = 0
+    redis_rety_limit = 5
+    logger.info("Running startup routine...")
+    global redis_client
+    while redis_rety_count < redis_rety_limit:
+        try:
+            redis_client = get_redis_client()
+            if redis_client is not None:
+                logger.info("Connected to Redis server successfully.")
+                break
+            else:
+                logger.error("Failed to connect to Redis server.")
+                redis_rety_count += 1
+                logger.info(f"Retrying connection to Redis... Attempt {redis_rety_count}/{redis_rety_limit}")
+        except Exception as e:
+            logger.error(f"Error connecting to Redis: {e}")
+            redis_rety_count += 1
+            logger.info(f"Retrying connection to Redis... Attempt {redis_rety_count}/{redis_rety_limit}")
 
 
 @asynccontextmanager
