@@ -701,6 +701,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
     if button_id == 'fetch-from-redis-button' :
         redis_key = manual_key_entry or (redis_key_store[-1] if redis_key_store else None)
         redis_key = redis_key.split(' - ')[0] if redis_key else None
+        redis_key = redis_key.strip()  
         if redis_key:
             try:
                 # Fetch data from Redis using the key if exists
@@ -740,6 +741,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
         redis_key = manual_processed_key_entry or (processed_key_store[-1] if processed_key_store else None)
         # keys is of the form <redis_key> - <analysis_type> so we need to split the key to get the redis key only no space and remove the analysis 
         redis_key = redis_key.split(' - ')[0] if redis_key else None
+        redis_key = redis_key.strip() 
         if redis_key:
             try:
                 logging.info(f"Fetching Redis Key - Processed Data: {redis_key}")
