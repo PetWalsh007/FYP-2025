@@ -1,36 +1,29 @@
 {
-    "databases": {
-        "postgres": {
-            "database": {
-                "tables": [
-                    "plc_step_test"
-                ]
-            }
-        },
-        "sql_server": {
-            "database": {
-                "tables": [
-                    "Device_Sensor_Data",
-                    "HistoricalData",
-                    "PLC_Area_X",
-                    "Energy_PLC_Area_Y",
-                    "Energy_PLC_Area_Z"
-                ]
-            }
-        }
-    },
     "database_options": [
         {
             "label": "Postgres - 1",
-            "value": "postgres-test-db"
+            "value": "postgres-test-db",
+            "tables": [
+                "plc_step_test"
+            ]
         },
         {
             "label": "SQL Server - 1",
-            "value": "sqlserver-test-db01"
+            "value": "sqlserver-test-db01",
+            "tables": [
+                "Device_Sensor_Data",
+                "HistoricalData",
+                "PLC_Area_X",
+                "Energy_PLC_Area_Y",
+                "Energy_PLC_Area_Z"
+            ]
         },
         {
             "label": "MySQL",
-            "value": "mysql"
+            "value": "mysql",
+            "tables": [
+                "dev"
+            ]
         }
     ],
     "endpoints": {

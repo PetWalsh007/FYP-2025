@@ -29,6 +29,7 @@ redis_port = 6379
 postgres_server_con = None  # Global variable for Postgres Server connection
 # Global dictionary for all external DB connections
 db_connections = {}
+db_time_cols = {}
 redis_client = None  # Global variable for Redis connection
 
 def app_startup_routine():
@@ -84,7 +85,7 @@ def connect_to_external_servers():
         query = ("""
             SELECT 
                 endpoint_name, endpoint_type, endpoint_ip, endpoint_port,
-                driver_name, database_name, connection_uname, connection_pwd
+                driver_name, database_name, connection_uname, connection_pwd, metadata
             FROM "Platform-Data".databases
             WHERE is_active = TRUE
         """)
@@ -99,6 +100,7 @@ def connect_to_external_servers():
             database_name = row["database_name"]
             connection_uname = row["connection_uname"]
             connection_pwd = row["connection_pwd"]
+            metadata = row["metadata"]
 
             logging.info(f"Attempting to connect to {endpoint_name} [{endpoint_type}] at {endpoint_ip}:{endpoint_port}...")
 
@@ -124,7 +126,17 @@ def connect_to_external_servers():
 
             except Exception as e:
                 logging.error(f"Failed to connect to {endpoint_name}: {e}")
+
+            # need to extract 'time_col_name' from metadata and add to the dict along with the connection obj
+            metadata_load = json.loads(metadata) if metadata else {}
+            time_col_name = metadata_load.get('time_col_name', None)
+            if time_col_name:
+                logging.info(f"Time column name for {endpoint_name}: {time_col_name}")
+            else:
+                logging.warning(f"No time column name found in metadata for {endpoint_name}.")
+                
             db_connections[endpoint_name] = con
+            db_time_cols[endpoint_name] = time_col_name
 
     except Exception as e:
         logging.error(f"Error fetching external DB config: {e}")
@@ -309,6 +321,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
     # get the connection object from the db_connections dictionary
     # we will use the connection object created globally
     connection_obj = db_connections.get(database)
+    time_col_name = db_time_cols.get(database)
     if connection_obj is None:
         logging.error(f"Connection to {database} failed.")
         return {"error": f"Connection to {database} failed."}
@@ -318,7 +331,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
         if table_name:
             date_filter = ""
             if start and end:
-                date_filter = f" time BETWEEN '{start_date}' AND '{end_date}'"
+                date_filter = f" {time_col_name} BETWEEN '{start_date}' AND '{end_date}'"
             query = f"SELECT * from {table_name} WHERE {date_filter}"
             logging.info(f"Executing SQL Server query: {query}")
             result = await db_query(query, connection_obj)
@@ -333,7 +346,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
         if table_name:
             date_filter = ""
             if start and end:
-                date_filter = f" AND {table_name}.datetime BETWEEN '{start}' AND '{end}'"
+                date_filter = f" AND {table_name}.{time_col_name} BETWEEN '{start}' AND '{end}'"
             query = f"SELECT * from {table_name} WHERE {fil_condition}{date_filter}"
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await db_query(query, connection_obj)
