@@ -968,8 +968,17 @@ def update_graph(x_axis, y_axes, g_type ,store_data):
     if not x_axis or not y_axes:
         return px.scatter(title="Select X and Y axes to display visualization.")
     
-    df[y_axes] = pd.to_numeric(df[y_axes], errors='coerce')  # Force clean numerics
+    if isinstance(y_axes, str):
+        y_axes = [y_axes]
 
+    # Force each y column to numeric
+    for y_col in y_axes:
+        if not pd.api.types.is_numeric_dtype(df[y_col]):
+            df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
+
+    df = df.dropna(subset=y_axes)
+    if df.empty:
+        return px.scatter(title="No valid data to plot after cleaning.")
 
     if not x_axis or not y_axes:
         return px.scatter(title="Select X and Y axes to display visualization.")
