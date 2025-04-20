@@ -201,8 +201,63 @@ async def healthcheck():
     
     return {"status": "OK"}
 
+@app.get("/config")
+async def get_config():
+    # Health check endpoint to verify if the service is running.
+    global db_connections
+    global postgres_server_con
+    global redis_client
+
+    logging.info("Received request for /config")
+    
+    # Check if the Postgres Server connection is established
+    if postgres_server_con.conn is None:
+        if postgres_server_con.con_err:
+            logging.error(f"Postgres Server connection error: {postgres_server_con.con_err}")
+            return {"error": postgres_server_con.con_err}
+        else:
+            logging.error("Postgres Server connection not established")
+            return {"error": "Postgres Server connection not established"}
+    
+    # Check if the Redis connection is established
+    if redis_client is None:
+        logging.error("Redis connection not established")
+        return {"error": "Redis connection not established"}
+
+    # fetch platform-Data.endpoints table and we can bundle it up into a json object and return it
+
+    query = """
+        SELECT
+            endpoint_name, endpoint_ip, endpoint_port
+            FROM "Platform-Data".endpoints
+            WHERE is_active = TRUE
+    """
+    try:
+        postgres_server_con.cursor.execute(query)
+        rows = postgres_server_con.cursor.fetchall()
+        logging.info(f"Query executed successfully: {query}")
+
+       
+        endpoints = {}
+        for row in rows:
+            endpoint_name = row[0]
+            endpoint_ip = row[1]
+            endpoint_port = row[2]
+            endpoints[endpoint_name] = {
+                "ip": endpoint_ip,
+                "port": endpoint_port
+            }
+
+        # log to output
+        logging.info(f"Formatted endpoints: {endpoints}")
 
 
+        return {"endpoints": endpoints}
+
+    except Exception as e:
+        logging.error(f"Error fetching endpoints: {e}")
+        return {"error": "Failed to fetch endpoints"}
+   
 
 
 # https://stackoverflow.com/questions/10252010/serializing-class-instance-to-json 

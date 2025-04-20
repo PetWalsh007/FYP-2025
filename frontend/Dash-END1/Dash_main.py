@@ -48,10 +48,83 @@ def load_config_call():
     CONFIG = load_config()
 
 
+def pull_config_data():
+    # function to pull the updated config data from the server db 
+
+    # send a request to the abstraction layer /healthcheck endpoint to see if tis active 
+    # if it is active then send a request to the abstraction layer /config endpoint to get the config data
+
+
+
+    config_local = load_config()
+    config_server = None
+
+
+    try:
+        response = requests.get(f"http://{CONFIG['endpoints']['db-connection-layer']['ip']}:{CONFIG['endpoints']['db-connection-layer']['port']}/healthcheck")
+        if response.status_code == 200:
+            logging.info("Abstraction layer is active")
+          
+    except Exception as e:
+        logging.error(f"Error connecting to abstraction layer: {e}")
+        return None
+
+    try:
+        response = requests.get(f"http://{CONFIG['endpoints']['db-connection-layer']['ip']}:{CONFIG['endpoints']['db-connection-layer']['port']}/config")
+        if response.status_code == 200:
+            config_server = response.json()
+            # if error in response then log the error and return None
+            if 'error' in config_server:
+                logging.error(f"Error pulling config data from server: {config_server['error']}")
+                return None
+            logging.info("Config data pulled from server")
+        else:
+            logging.error(f"Error pulling config data from server: {response.status_code}")
+            return None
+    except Exception as e:
+        logging.error(f"Error connecting to abstraction layer: {e}")
+        return None
+
+    # comparing local config with server config and updating local config with server config
+
+    try:
+        # Extracting the "endpoints" section from both configurations
+        local_endpoints = config_local.get("endpoints", {})
+        server_endpoints = config_server.get("endpoints", {})
+
+        # Compare and update the local endpoints with server endpoints
+        for key, server_endpoint in server_endpoints.items():
+            if key not in local_endpoints or local_endpoints[key] != server_endpoint:
+                logging.info(f"Updating endpoint '{key}' in local config with server data.")
+                local_endpoints[key] = server_endpoint
+
+        # Save the updated endpoints back to the local configuration
+        config_local["endpoints"] = local_endpoints
+
+        # Save the updated local configuration to the config file
+        save_config(config_local)
+        logging.info("Local configuration updated successfully with server data.")
+
+    except Exception as e:
+        logging.error(f"Error updating local config with server data: {e}")
+
+
+    pass
+
+
+
+
+
+
+
 def app_startup_routine():
     logging.info("App started")
+    load_config_call()
 
-    # to add call to backend to update the config file if needed on start up - this is a placeholder for now
+    pull_config_data()
+
+    load_config_call()
+
     
 
 
@@ -72,15 +145,15 @@ except Exception as e:
 
 app_startup_routine()  # Call the startup routine to load the config and log the startup
      
-load_config_call()
+
 
 
 
 
 def connect_redis():
     
-    redis_host = CONFIG['endpoints']['redis']['ip']
-    redis_port = CONFIG['endpoints']['redis']['port']
+    redis_host = CONFIG['endpoints']['redis-memory-store']['ip']
+    redis_port = CONFIG['endpoints']['redis-memory-store']['port']
     global redis_client
     try:
         redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
@@ -94,6 +167,8 @@ def connect_redis():
     
 
 connect_redis()  # Connect to Redis server at the start of the app
+
+
 if redis_client is None:
     t=5
     logging.error("Failed to connect to Redis server. Retrying...")
@@ -186,7 +261,7 @@ def main_page_layout():
             html.Label('Select the database to query:', style={'fontSize': '18px', 'marginRight': '10px'}),
             dcc.Dropdown(
                 id='database',
-                options=config.get("database_options", []),
+                options=CONFIG.get("database_options", []),
                 value='postgres',
                 style={'fontSize': '18px', 'width': '170px', 'marginRight': '10px'}
             ),
@@ -215,7 +290,7 @@ def main_page_layout():
             dcc.Input(id='redis-key-for-proc', type='text', placeholder="Enter Raw Data Key", style={'marginRight': '10px', 'fontSize': '16px', 'padding': '5px'}),
             dcc.Dropdown(
                 id='analysis-type',
-                options=config.get("analytics", []),
+                options=CONFIG.get("analytics", []),
                 placeholder="Select Analysis Type",
                 style={'fontSize': '12px', 'width': '200px', 'marginRight': '10px'}
             ),
@@ -309,7 +384,7 @@ page2_layout = html.Div([
     
     dcc.Textarea(
         id='config-textarea',
-        value=json.dumps(config, indent=4),
+        value=json.dumps(CONFIG, indent=4),
         style={'width': '100%', 'height': 300},
     ),
     dcc.ConfirmDialog(
@@ -438,7 +513,7 @@ def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoin
 
 def send_data_to_server(data):
     # data is a dictionary containing the data to be sent to the server - can we the full dictionay to the backend for it to unpack 
-    response = requests.post(f"http://{CONFIG['endpoints']['abstraction']['ip']}:{CONFIG['endpoints']['abstraction']['port']}/add_database_connection", json=data)
+    response = requests.post(f"http://{CONFIG['endpoints']['db-connection-layer']['ip']}:{CONFIG['endpoints']['db-connection-layer']['port']}/add_database_connection", json=data)
     logging.info(f"Sending data to server: {data}")
     message = response.json().get('message', 'No message returned')
     return f"Message From Server: {message}"
@@ -478,8 +553,8 @@ def restart_dbs_confirm(n_clicks):
 )
 def restart_server_dbs(submit_n_clicks):
     if submit_n_clicks:
-        endpoint_ip = CONFIG['endpoints']['abstraction']['ip']
-        endpoint_port = CONFIG['endpoints']['abstraction']['port']
+        endpoint_ip = CONFIG['endpoints']['db-connection-layer']['ip']
+        endpoint_port = CONFIG['endpoints']['db-connection-layer']['port']
         response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/command?rst=restart_server_main_abstraction')
         time.sleep(2) # for a wait time to allow the server to restart
         # extract message from response
@@ -890,6 +965,10 @@ def update_graph(x_axis, y_axes, g_type ,store_data):
         return px.pie(title="No Data Available. Fetch Data First.")
 
     df = pd.DataFrame(store_data["onscreen_data"])
+    if not x_axis or not y_axes:
+        return px.scatter(title="Select X and Y axes to display visualization.")
+    
+    df[y_axes] = pd.to_numeric(df[y_axes], errors='coerce')  # Force clean numerics
 
 
     if not x_axis or not y_axes:
@@ -930,8 +1009,8 @@ def get_data(n_clicks, redis_key_proc):
    
     # use the config file to get the table name and database name
     #database_table_sel = CONFIG['databases'][db_sel]['database']['table']
-    endpoint_ip = CONFIG['endpoints']['backend']['ip']
-    endpoint_port = CONFIG['endpoints']['backend']['port']
+    endpoint_ip = CONFIG['endpoints']['backend-service']['ip']
+    endpoint_port = CONFIG['endpoints']['backend-service']['port']
 
     data = {
     "values": [
@@ -963,8 +1042,8 @@ def get_data_all(db_sel, tbl_sel, st_date, end_date):
     #using config file to get the table name
   
     #database_table_sel = CONFIG['databases'][db_sel]['database']['table']
-    endpoint_ip = CONFIG['endpoints']['abstraction']['ip']
-    endpoint_port = CONFIG['endpoints']['abstraction']['port']
+    endpoint_ip = CONFIG['endpoints']['db-connection-layer']['ip']
+    endpoint_port = CONFIG['endpoints']['db-connection-layer']['port']
     logging.info(f"Fetching data from {endpoint_ip}:{endpoint_port}")
     response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&start={st_date}&end={end_date}') # updated to take the table name from the dropdown
     response_json = response.json()
@@ -988,8 +1067,8 @@ def get_data_all(db_sel, tbl_sel, st_date, end_date):
 def send_data_for_processing(redis_key_proc, analysis_typ):
     # This function will send data to the appropriate LxCT for processing
 
-    endpoint_ip = CONFIG['endpoints']['backend']['ip']
-    endpoint_port = CONFIG['endpoints']['backend']['port']
+    endpoint_ip = CONFIG['endpoints']['backend-service']['ip']
+    endpoint_port = CONFIG['endpoints']['backend-service']['port']
     logging.info(f"Sending data for processing to {endpoint_ip}:{endpoint_port}")
 
     dual_key = False
