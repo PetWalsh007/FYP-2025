@@ -44,8 +44,8 @@ def save_config(config_data):
 
 
 def load_config_call():
-    global config
-    config = load_config()
+    global CONFIG
+    CONFIG = load_config()
 
 
 def app_startup_routine():
@@ -79,8 +79,8 @@ load_config_call()
 
 def connect_redis():
     
-    redis_host = config['endpoints']['redis']['ip']
-    redis_port = config['endpoints']['redis']['port']
+    redis_host = CONFIG['endpoints']['redis']['ip']
+    redis_port = CONFIG['endpoints']['redis']['port']
     global redis_client
     try:
         redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
@@ -104,9 +104,9 @@ if redis_client is None:
             logging.info("Connected to Redis server successfully after retry.")
             break
         t += 5
-        logging.error(f"Retrying to connect to Redis server {config['endpoints']['redis']['ip']}...")
+        logging.error(f"Retrying to connect to Redis server {CONFIG['endpoints']['redis']['ip']}...")
     if redis_client is None:
-        logging.error(f"Failed to connect to Redis server {config['endpoints']['redis']['ip']} after retrying....")
+        logging.error(f"Failed to connect to Redis server {CONFIG['endpoints']['redis']['ip']} after retrying....")
         raise ConnectionError("Could not connect to Redis server. Exiting...")
         
     
@@ -194,7 +194,7 @@ def main_page_layout():
                 id="table_name",
                 options = [
                     {"label": f"{db_info['label']} - {table}", "value": table}
-                    for db_info in config["database_options"]
+                    for db_info in CONFIG["database_options"]
                     for table in db_info.get("tables", [])
                 ],
                 value=None,
@@ -438,7 +438,7 @@ def update_database(n_clicks, endpoint_name, endpoint_type, endpoint_ip, endpoin
 
 def send_data_to_server(data):
     # data is a dictionary containing the data to be sent to the server - can we the full dictionay to the backend for it to unpack 
-    response = requests.post(f"http://{config['endpoints']['abstraction']['ip']}:{config['endpoints']['abstraction']['port']}/add_database_connection", json=data)
+    response = requests.post(f"http://{CONFIG['endpoints']['abstraction']['ip']}:{CONFIG['endpoints']['abstraction']['port']}/add_database_connection", json=data)
     logging.info(f"Sending data to server: {data}")
     message = response.json().get('message', 'No message returned')
     return f"Message From Server: {message}"
@@ -478,8 +478,8 @@ def restart_dbs_confirm(n_clicks):
 )
 def restart_server_dbs(submit_n_clicks):
     if submit_n_clicks:
-        endpoint_ip = config['endpoints']['abstraction']['ip']
-        endpoint_port = config['endpoints']['abstraction']['port']
+        endpoint_ip = CONFIG['endpoints']['abstraction']['ip']
+        endpoint_port = CONFIG['endpoints']['abstraction']['port']
         response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/command?rst=restart_server_main_abstraction')
         time.sleep(2) # for a wait time to allow the server to restart
         # extract message from response
@@ -684,7 +684,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
         response_json = get_data_all( db_sel, tbl_sel, st_date, end_date)  # Calls backend
         redis_key = response_json.get("redis_key")
         db_sel_lbl = next(
-                                (item['label'] for item in config['database_options'] if item['value'] == db_sel),
+                                (item['label'] for item in CONFIG['database_options'] if item['value'] == db_sel),
                                 None  
                             )
         if db_sel_lbl:
@@ -819,7 +819,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
                     processed_key_store = []
                     
                 analysis_type_lbl = next(
-                                        (item['label'] for item in config['analytics'] if item['value'] == analysis_type),
+                                        (item['label'] for item in CONFIG['analytics'] if item['value'] == analysis_type),
                                         None  
                                     )
                 if analysis_type_lbl:
@@ -929,9 +929,9 @@ def get_data(n_clicks, redis_key_proc):
     # This function will send a request to the FastAPI server to get data from the database
    
     # use the config file to get the table name and database name
-    #database_table_sel = config['databases'][db_sel]['database']['table']
-    endpoint_ip = config['endpoints']['backend']['ip']
-    endpoint_port = config['endpoints']['backend']['port']
+    #database_table_sel = CONFIG['databases'][db_sel]['database']['table']
+    endpoint_ip = CONFIG['endpoints']['backend']['ip']
+    endpoint_port = CONFIG['endpoints']['backend']['port']
 
     data = {
     "values": [
@@ -962,9 +962,9 @@ def get_data_all(db_sel, tbl_sel, st_date, end_date):
     
     #using config file to get the table name
   
-    #database_table_sel = config['databases'][db_sel]['database']['table']
-    endpoint_ip = config['endpoints']['abstraction']['ip']
-    endpoint_port = config['endpoints']['abstraction']['port']
+    #database_table_sel = CONFIG['databases'][db_sel]['database']['table']
+    endpoint_ip = CONFIG['endpoints']['abstraction']['ip']
+    endpoint_port = CONFIG['endpoints']['abstraction']['port']
     logging.info(f"Fetching data from {endpoint_ip}:{endpoint_port}")
     response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&start={st_date}&end={end_date}') # updated to take the table name from the dropdown
     response_json = response.json()
@@ -988,8 +988,8 @@ def get_data_all(db_sel, tbl_sel, st_date, end_date):
 def send_data_for_processing(redis_key_proc, analysis_typ):
     # This function will send data to the appropriate LxCT for processing
 
-    endpoint_ip = config['endpoints']['backend']['ip']
-    endpoint_port = config['endpoints']['backend']['port']
+    endpoint_ip = CONFIG['endpoints']['backend']['ip']
+    endpoint_port = CONFIG['endpoints']['backend']['port']
     logging.info(f"Sending data for processing to {endpoint_ip}:{endpoint_port}")
 
     dual_key = False
