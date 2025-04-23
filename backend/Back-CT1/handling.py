@@ -141,6 +141,10 @@ def get_redis_client():
 
 
 def app_startup_routine():
+    # ---------------------
+    # Get config data from the server db - output to file
+    # ---------------------
+
     rsp = None
     retry_count = 0
     load_config_call()
@@ -154,8 +158,6 @@ def app_startup_routine():
 
     load_config_call()
 
-    
-    
     
     
     
@@ -177,9 +179,6 @@ def app_startup_routine():
             logger.error(f"Error during app startup: {e}")
 
 
-    # ---------------------
-    # Get config data from the server db - output to file
-    # ---------------------
 
     
         
