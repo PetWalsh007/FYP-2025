@@ -168,22 +168,24 @@ def connect_redis():
 
 connect_redis()  # Connect to Redis server at the start of the app
 
-
-if redis_client is None:
-    t=5
-    logging.error("Failed to connect to Redis server. Retrying...")
-    while t < 30:
-        time.sleep(t)
-        connect_redis()  # Retry connecting to Redis server
-        if redis_client:
-            logging.info("Connected to Redis server successfully after retry.")
-            break
-        t += 5
-        logging.error(f"Retrying to connect to Redis server {CONFIG['endpoints']['redis']['ip']}...")
+try:
     if redis_client is None:
-        logging.error(f"Failed to connect to Redis server {CONFIG['endpoints']['redis']['ip']} after retrying....")
-        raise ConnectionError("Could not connect to Redis server. Exiting...")
-        
+        t=5
+        logging.error("Failed to connect to Redis server. Retrying...")
+        while t < 30:
+            time.sleep(t)
+            connect_redis()  # Retry connecting to Redis server
+            if redis_client:
+                logging.info("Connected to Redis server successfully after retry.")
+                break
+            t += 5
+            logging.error(f"Retrying to connect to Redis server {CONFIG['endpoints']['redis-memory-store']['ip']}...")
+        if redis_client is None:
+            logging.error(f"Failed to connect to Redis server {CONFIG['endpoints']['redis-memory-store']['ip']} after retrying....")
+            raise ConnectionError("Could not connect to Redis server. Exiting...")
+except Exception as e:
+    logging.error(f"Error connecting to Redis server: {e}")
+    raise ConnectionError("Could not connect to Redis server. Exiting...")    
     
 
 dev_style = {
@@ -967,6 +969,7 @@ def update_graph(x_axis, y_axes, g_type ,store_data):
     df = pd.DataFrame(store_data["onscreen_data"])
     if not x_axis or not y_axes:
         return px.scatter(title="Select X and Y axes to display visualization.")
+
     
     if isinstance(y_axes, str):
         y_axes = [y_axes]
