@@ -12,7 +12,7 @@ import logging
 import redis as rd
 import json
 import random
-
+from time import sleep
 from typing import Dict, Any
 
 import Custom_Fuzzy as fuzzy
@@ -74,9 +74,11 @@ def pull_config_data():
     config_local = load_config()
     config_server = None
 
-
+    endpoint_ip = CONFIG['endpoints']['db-connection-layer']['ip']
+    endpoint_port = CONFIG['endpoints']['db-connection-layer']['port']
+    
     try:
-        response = requests.get(f"http://{CONFIG['endpoints']['db-connection-layer']['ip']}:{CONFIG['endpoints']['db-connection-layer']['port']}/healthcheck")
+        response = requests.get(f"http://{endpoint_ip}:{endpoint_port}/healthcheck")
         if response.status_code == 200:
             logging.info("Abstraction layer is active")
           
@@ -85,7 +87,7 @@ def pull_config_data():
         return None
 
     try:
-        response = requests.get(f"http://{CONFIG['endpoints']['db-connection-layer']['ip']}:{CONFIG['endpoints']['db-connection-layer']['port']}/config")
+        response = requests.get(f"http://{endpoint_ip}:{endpoint_port}/config")
         if response.status_code == 200:
             config_server = response.json()
             # if error in response then log the error and return None
@@ -130,8 +132,10 @@ def pull_config_data():
 
 def get_redis_client():
     con_redis = None
+    redis_ep=CONFIG['endpoints']['redis-memory-store']['ip']
+    redis_port=CONFIG['endpoints']['redis-memory-store']['port']
     try:
-        con_redis = rd.StrictRedis(host=CONFIG_FILE['endpoints']['redis-memory-store']['ip'], port=CONFIG_FILE['endpoints']['redis-memory-store']['port'], db=0)
+        con_redis = rd.StrictRedis(host=redis_ep, port=redis_port, db=0)
         con_redis.ping()
         logger.info("Connected to Redis server successfully.")
         return con_redis
@@ -167,8 +171,10 @@ def app_startup_routine():
     while redis_client is None and redis_con_attempt < redis_con_max_attempts:
         try:
             redis_client = get_redis_client()
+            sleep(1)  # Sleep for 1 second before retrying
             if redis_client is None:
                 logger.error("Failed to connect to Redis server.")
+                redis_con_attempt += 1
                 raise Exception("Redis connection failed")
             if redis_client.ping():
                 logger.info("Redis client ping successful.")
@@ -177,6 +183,7 @@ def app_startup_routine():
 
         except Exception as e:
             logger.error(f"Error during app startup: {e}")
+            redis_con_attempt += 1
 
 
 
