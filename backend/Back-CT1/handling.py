@@ -37,15 +37,101 @@ logger = logging.getLogger(__name__)
 
 logger.info("Starting FastAPI lifespan function...")
 
-redis_host ='192.168.1.83'
-redis_port = 6379
-redis_client = None 
+
+redis_client = None
+
+
+
+# Load the existing config
+CONFIG_FILE = "config.json"
+
+def load_config():
+    try:
+        with open(CONFIG_FILE, "r") as file:
+            return json.load(file)
+    except Exception as e:
+        logging.error(f"Error loading config file: {e}")
+        return {}
+
+def save_config(config_data):
+    with open(CONFIG_FILE, "w") as file:
+        json.dump(config_data, file, indent=4)
+
+
+def load_config_call():
+    global CONFIG
+    CONFIG = load_config()
+
+
+def pull_config_data():
+    # function to pull the updated config data from the server db 
+
+    # send a request to the abstraction layer /healthcheck endpoint to see if tis active 
+    # if it is active then send a request to the abstraction layer /config endpoint to get the config data
+
+
+
+    config_local = load_config()
+    config_server = None
+
+
+    try:
+        response = requests.get(f"http://{CONFIG['endpoints']['db-connection-layer']['ip']}:{CONFIG['endpoints']['db-connection-layer']['port']}/healthcheck")
+        if response.status_code == 200:
+            logging.info("Abstraction layer is active")
+          
+    except Exception as e:
+        logging.error(f"Error connecting to abstraction layer: {e}")
+        return None
+
+    try:
+        response = requests.get(f"http://{CONFIG['endpoints']['db-connection-layer']['ip']}:{CONFIG['endpoints']['db-connection-layer']['port']}/config")
+        if response.status_code == 200:
+            config_server = response.json()
+            # if error in response then log the error and return None
+            if 'error' in config_server:
+                logging.error(f"Error pulling config data from server: {config_server['error']}")
+                return None
+            logging.info("Config data pulled from server")
+        else:
+            logging.error(f"Error pulling config data from server: {response.status_code}")
+            return None
+    except Exception as e:
+        logging.error(f"Error connecting to abstraction layer: {e}")
+        return None
+
+    # comparing local config with server config and updating local config with server config
+
+    try:
+        # Extracting the "endpoints" section from both configurations
+        local_endpoints = config_local.get("endpoints", {})
+        server_endpoints = config_server.get("endpoints", {})
+
+        # Compare and update the local endpoints with server endpoints
+        for key, server_endpoint in server_endpoints.items():
+            if key not in local_endpoints or local_endpoints[key] != server_endpoint:
+                logging.info(f"Updating endpoint '{key}' in local config with server data.")
+                local_endpoints[key] = server_endpoint
+
+        # Save the updated endpoints back to the local configuration
+        config_local["endpoints"] = local_endpoints
+
+        # Save the updated local configuration to the config file
+        save_config(config_local)
+        logging.info("Local configuration updated successfully with server data.")
+
+    except Exception as e:
+        logging.error(f"Error updating local config with server data: {e}")
+
+    return True
+
+    pass
 
 
 def get_redis_client():
     con_redis = None
     try:
-        con_redis = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+        con_redis = rd.StrictRedis(host=CONFIG_FILE['endpoints']['redis-memory-store']['ip'], port=CONFIG_FILE['endpoints']['redis-memory-store']['port'], db=0)
         con_redis.ping()
         logger.info("Connected to Redis server successfully.")
         return con_redis
@@ -55,6 +141,27 @@ def get_redis_client():
 
 
 def app_startup_routine():
+    rsp = None
+    retry_count = 0
+
+    
+    # ---------------------
+    # Get config data from the server db - output to file
+    # ---------------------
+
+    
+    load_config_call()
+
+
+        
+
+    load_config_call()
+
+    
+    
+    
+    
+    
     global redis_client
     redis_con_attempt = 0
     redis_con_max_attempts = 5
@@ -71,6 +178,10 @@ def app_startup_routine():
 
         except Exception as e:
             logger.error(f"Error during app startup: {e}")
+
+
+
+    
         
 
 
@@ -245,10 +356,12 @@ def send_data_to_server_db(proc_key: str, redis_key: str, operation: str, flag: 
     """
     Function to send processed data to the internal server database.
     """
+    endpoint_ip = CONFIG['endpoints']['db-connection-layer']['ip']
+    endpoint_port = CONFIG['endpoints']['db-connection-layer']['port']
     try:
         logger.info(f"Sending data to server with proc_key: {proc_key}, redis_key: {redis_key}, operation: {operation}, flag: {flag}")
         # Placeholder for actual implementation
-        url = f"http://192.168.1.81:8000/store_processed_data?key_proc={proc_key}&key_raw={redis_key}&analysis_type={operation}&flag={flag}"  # Replace with actual server URL
+        url = f"http://{endpoint_ip}:{endpoint_port}/store_processed_data?key_proc={proc_key}&key_raw={redis_key}&analysis_type={operation}&flag={flag}"  # Replace with actual server URL
         response = requests.post(url)
         
         if response.status_code != 200:
