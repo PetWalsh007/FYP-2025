@@ -359,6 +359,23 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
     global db_connections
     global postgres_server_con
 
+    # build a query string to store in a lookup in redis 
+
+    redis_query_key = f"{database}_{table_name}_{start}_{end}"
+    # check redis for key and return value to front end if it exsits 
+    try:
+        # check if the key exists in redis
+        redis_value = redis_client.get(redis_query_key)
+        if redis_value:
+            logging.info(f"Key {redis_query_key} found in Redis, returning cached value.")
+            
+            
+            return {"redis_key": redis_value}
+    except Exception as e:
+        logging.error(f"Error checking Redis for key {redis_query_key}: {e}")
+        return {"error": f"Error checking Redis for key {redis_query_key}"}
+
+
     logging.info(f"Received request for /data with database: {database},  table_name: {table_name}, fil_condition: {fil_condition}, limit: {limit}, start: {start}, end: {end}")
     if start is None or end is None:
         logging.error("No start or end date provided")
@@ -390,7 +407,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
             query = f"SELECT * from {table_name} WHERE {date_filter}"
             logging.info(f"Executing SQL Server query: {query}")
             result = await db_query(query, connection_obj)
-            redis_db_key = send_to_redis(result)
+            redis_db_key = send_to_redis(result, redis_query_key)
             # we need to send to postgres server db to store key id etc 
             store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}
@@ -405,7 +422,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
             query = f"SELECT * from {table_name} WHERE {fil_condition}{date_filter}"
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await db_query(query, connection_obj)
-            redis_db_key = send_to_redis(result)
+            redis_db_key = send_to_redis(result, redis_query_key)
             store_query_data(redis_db_key, query, table_name, database)
             return {"redis_key": redis_db_key}
         else:
@@ -509,19 +526,43 @@ async def db_query(query, con_obj):
 
 # function to send to redis
 
-def send_to_redis(redis_value):
+def send_to_redis(redis_value, redis_qry_key):
     # Send data to Redis with a random key and return the key to the call which returns to user
-    logging.info(f"Storing result in Redis with random key")
-    rand_number = random.randint(1, 1000)
-    # add 5 random alpha chars to the rand_number to make it unique
-    redis_key = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=6))
-    logging.info(f"Generated random key: {redis_key}")
+
+
+    while True:
+        try:
+            logging.info(f"Storing result in Redis with random key")
+            rand_number = random.randint(1, 1000)
+            # add 5 random alpha chars to the rand_number to make it unique
+            redis_key = str(rand_number) + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=6))
+            # check if key already exists in redis
+            if redis_client.exists(redis_key):
+                logging.info(f"Key {redis_key} already exists in Redis, generating a new key...")
+                continue  # Key exists, generate a new one
+            else:
+                logging.info(f"Generated random key: {redis_key}")
+                break  # Key is unique, exit the loop
+            
+        except Exception as e:
+            logging.error(f"Error generating random key: {e}")
+            return {"Error generating random key"}
     try:
         redis_client.set(redis_key, json.dumps(redis_value, default=json_serial), ex=3600)  # Set TTL to 1 hour
         logging.info(f"Stored result in Redis with key: {redis_key}")
     except Exception as e:
         logging.error(f"Error storing result in Redis: {e}")
         return {"Error storing result in Redis"}
+
+    
+    # first store the query in redis with the key as the query string
+    try:
+        redis_client.set(redis_qry_key, redis_key,  ex=3600)  # Set TTL to 1 hour
+        logging.info(f"Stored result in Redis with key: {redis_qry_key}")
+    except Exception as e:
+        logging.error(f"Error storing result in Redis: {e}")
+        return {"Error storing result in Redis"}
+
     return redis_key
 
 
