@@ -368,7 +368,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
         redis_value = redis_client.get(redis_query_key)
         if redis_value:
             logging.info(f"Key {redis_query_key} found in Redis, returning cached value.")
-            
+            store_query_data(redis_value, reuse_qry=True)
             
             return {"redis_key": redis_value}
     except Exception as e:
@@ -409,7 +409,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
             result = await db_query(query, connection_obj)
             redis_db_key = send_to_redis(result, redis_query_key)
             # we need to send to postgres server db to store key id etc 
-            store_query_data(redis_db_key, query, table_name, database)
+            store_query_data(redis_db_key, query_table=table_name, query_db=database, reuse_qry=False, qry=query)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -423,7 +423,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await db_query(query, connection_obj)
             redis_db_key = send_to_redis(result, redis_query_key)
-            store_query_data(redis_db_key, query, table_name, database)
+            store_query_data(redis_db_key, query_table=table_name, query_db=database, reuse_qry=False, qry=query)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -471,13 +471,9 @@ async def rec_store_req(key_proc: str = "null", key_raw: str = "null", analysis_
 
 
 
-def store_query_data(key, qry, query_table, query_db):
+def store_query_data(key, query_table="", query_db="", reuse_qry=False, qry=""):
     # this will take the redis key and the query and store iin the data base 
-
-
-    # we will use the connection object created globally
-    logging.info(f"Received request for /store_query_data")
-    # send query to postgres server db
+     # Shared connection check
     if postgres_server_con.conn is None:
         if postgres_server_con.con_err:
             logging.error(f"Postgres Server connection error: {postgres_server_con.con_err}")
@@ -485,12 +481,17 @@ def store_query_data(key, qry, query_table, query_db):
         else:
             logging.error("Postgres Server connection not established")
             return {"error": "SQL Server connection not established"}
-    
-    table = "redis_data.redis_cache_log"
-    query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table) VALUES (?, ?, ?, ?)"
-       
-
-    values = (key, qry, query_db, query_table)
+    logging.info(f"value of reuse_qry: {reuse_qry}")
+    if reuse_qry:
+        logging.info(f"Received request for /store_query_data with reuse_qry: {reuse_qry}, key: {key}, query_table: {query_table}, query_db: {query_db}")
+        table = "redis_data.reused_queries"
+        query = f"INSERT INTO {table} (redis_key) VALUES (?)"
+        values = (key,) # one tuple value req
+    else:
+        logging.info(f"Received request for /store_query_data")
+        table = "redis_data.redis_cache_log"
+        query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table) VALUES (?, ?, ?, ?)"
+        values = (key, qry, query_db, query_table)
 
     logging.info(f"Executing Postgres Server query: {query} with values {values}")
     # execute and commit the query
@@ -509,8 +510,8 @@ def store_query_data(key, qry, query_table, query_db):
     
 # Function to query SQL Server database
 async def db_query(query, con_obj):
-    # Test SQL Server connection
-    # we want to use the connection object created globally 
+    # standard function to query the database and return the result
+    
     logging.info(f"Received request for /sql_server")
     if con_obj.conn is None:
         if con_obj.con_err:
@@ -521,7 +522,6 @@ async def db_query(query, con_obj):
 
     return result
 
-# Function to query PostgreSQL database
 
 
 # function to send to redis
