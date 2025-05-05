@@ -111,3 +111,59 @@ def daily_average(dataframe, info):
 
 
    
+# new simple analysis function to compute other daily statistics such as min, max, std, etc.
+def daily_statistics(dataframe, info):
+    logger.info("Starting daily_statistics function")
+    try:
+        # Get the position of the timestamp column from the info dictionary
+        time_position = info.get("time_columns_position", [])
+        if not time_position:
+            raise ValueError("No time column position provided in info dictionary.")
+
+        # Identify the timestamp column
+        timestamp_raw = time_position[0]
+        if isinstance(timestamp_raw, str):
+            timestamp_col = timestamp_raw
+        elif isinstance(timestamp_raw, int):
+            timestamp_col = dataframe.columns[timestamp_raw]
+        else:
+            raise TypeError(f"Invalid type for time column reference: {type(timestamp_raw)}")
+
+        logger.info(f"Timestamp column identified: '{timestamp_col}'")
+
+        # Log the shape of the original DataFrame
+        logger.info(f"Original DataFrame shape: {dataframe.shape}")
+
+        # Convert the timestamp column to datetime if it's not already
+        dataframe[timestamp_col] = pd.to_datetime(dataframe[timestamp_col], errors='coerce')
+
+        # Check for NaT values in the timestamp column 
+        na_rows = dataframe[dataframe[timestamp_col].isna()]
+        if not na_rows.empty:
+            logger.info(f"First 5 rows with NaT in '{timestamp_col}': {na_rows.head(5)}")
+        else:
+            logger.info(f"No NaT values found in '{timestamp_col}' column.")
+
+        # get the date 
+        dataframe["date"] = dataframe[timestamp_col].dt.date
+
+        # get numeric column names from the info dict
+        numeric_cols = [col["name"] for col in info.get("columns", []) if col.get("is_numeric")]
+        if timestamp_col in numeric_cols:
+            numeric_cols.remove(timestamp_col)  # Remove timestamp column if marked numeric
+
+        logger.info(f"Numeric columns used for statistics: {numeric_cols}")
+
+        # calc daily statistics using groupby
+        daily_stats_df = dataframe.groupby("date")[numeric_cols].agg(['mean', 'min', 'max', 'std']).reset_index()
+
+        # Log number of rows in  DataFrame
+        logger.info(f"Total rows in the daily statistics DataFrame: {len(daily_stats_df)}")
+        # Flatten multi-level column names to avoid tuple issues in redis store 
+        daily_stats_df.columns = ['_'.join(col).strip('_') if isinstance(col, tuple) else col for col in daily_stats_df.columns]
+
+        return daily_stats_df
+
+    except Exception as e:
+        logger.error(f"Error in daily_statistics: {str(e)}")
+        return

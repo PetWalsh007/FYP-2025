@@ -330,6 +330,36 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
         
 
 
+            # send data to redis store 
+            logger.info(f"Sending processed data to Redis...")
+            proc_key = send_processed_data_to_redis(updated_data_df)
+
+            try:
+                val = send_data_to_server_db( proc_key, redis_key, operation, flag=1)
+                try: 
+                    if "error" in val:
+                        logger.error(f"Error sending data to server: {val['error']}")
+                        return {"error": val["error"]}
+                    else:
+                        logger.info(f"Data sent to server successfully: {val}")
+                except Exception as e:
+                    logger.error(f"Error processing server response: {str(e)}")
+                    return {"error": "Failed to process server response"}
+            except Exception as e:
+                logger.error(f"Error sending data to server: {str(e)}")
+                return {"error": "Failed to send data to server"}
+
+            return {"redis_key": proc_key}
+    except:
+        logger.error(f"Unsupported operation: {operation}")
+        return {"error": "Unsupported operation"}
+    
+
+    try:
+        if operation == "Smp_Daily_Statistics":
+            logger.info(f"Processing data for daily statistics... calling analysis function")
+            updated_data_df = smp.daily_statistics(df, data_info)
+
         # send data to redis store 
         logger.info(f"Sending processed data to Redis...")
         proc_key = send_processed_data_to_redis(updated_data_df)
@@ -354,7 +384,6 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
         logger.error(f"Unsupported operation: {operation}")
         return {"error": "Unsupported operation"}
     
-
     # send the processed data to internal server
 
 
@@ -453,9 +482,18 @@ def send_processed_data_to_redis(data):
         key_num = random.randint(1, 10000)
         key_str = random.choice(['a', 'b', 'c', 'd', 'e'])
         key = f"processed_data:{key_num}{key_str}"
-        redis_key = key
+        redis_key = str(key)
+        if isinstance(redis_key, tuple):
+            logger.info(f"Redis key is a tuple")
+            redis_key = redis_key[0]
         logger.info(f"Generated Redis key: {redis_key}")
         # Store the processed data in Redis
+
+        logger.info(f"Type redis_key: {type(redis_key)} | Value: {redis_key}")
+        json_payload = json.dumps(data, default=json_serial)
+        logger.info(f"Type of JSON payload: {type(json_payload)}")
+        logger.info(f"Type of redis_client.set: {type(redis_client.set)}")
+
         redis_client.set(redis_key, json.dumps(data, default=json_serial), ex=7200)  # TTL to 2 hours
         
 
