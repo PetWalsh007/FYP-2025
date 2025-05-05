@@ -353,14 +353,14 @@ async def add_database_connection(request: Request):
 
 
 @app.get("/data")
-async def get_data(database: str = "null",table_name: str = "null", fil_condition: str = '1=1', limit: int = 10, start: str = None, end: str = None):
+async def get_data(database: str = "null",table_name: str = "null", fil_condition: str = '1=1', limit: int = 10, start: str = None, end: str = None, user:str = "null"):
     # Check if the database is SQL Server
     # log all the inputs to the function
     global db_connections
     global postgres_server_con
 
     # build a query string to store in a lookup in redis 
-
+    logging.info(f"user: {user}")
     redis_query_key = f"{database}_{table_name}_{start}_{end}"
     # check redis for key and return value to front end if it exsits 
     try:
@@ -409,7 +409,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
             result = await db_query(query, connection_obj)
             redis_db_key = send_to_redis(result, redis_query_key)
             # we need to send to postgres server db to store key id etc 
-            store_query_data(redis_db_key, query_table=table_name, query_db=database, reuse_qry=False, qry=query)
+            store_query_data(redis_db_key, query_table=table_name, query_db=database, reuse_qry=False, qry=query, user=user)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -423,7 +423,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
             logging.info(f"Executing PostgreSQL query: {query}")
             result = await db_query(query, connection_obj)
             redis_db_key = send_to_redis(result, redis_query_key)
-            store_query_data(redis_db_key, query_table=table_name, query_db=database, reuse_qry=False, qry=query)
+            store_query_data(redis_db_key, query_table=table_name, query_db=database, reuse_qry=False, qry=query, user=user)
             return {"redis_key": redis_db_key}
         else:
             return {"error": "No table name provided"}
@@ -471,7 +471,7 @@ async def rec_store_req(key_proc: str = "null", key_raw: str = "null", analysis_
 
 
 
-def store_query_data(key, query_table="", query_db="", reuse_qry=False, qry=""):
+def store_query_data(key, query_table="", query_db="", reuse_qry=False, qry="", user="null"):
     # this will take the redis key and the query and store iin the data base 
      # Shared connection check
     if postgres_server_con.conn is None:
@@ -490,9 +490,8 @@ def store_query_data(key, query_table="", query_db="", reuse_qry=False, qry=""):
     else:
         logging.info(f"Received request for /store_query_data")
         table = "redis_data.redis_cache_log"
-        query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table) VALUES (?, ?, ?, ?)"
-        values = (key, qry, query_db, query_table)
-
+        query = f"INSERT INTO {table} (redis_key, query_text, query_database, query_table, client_ip) VALUES (?, ?, ?, ?, ?)"
+        values = (key, qry, query_db, query_table, user)
     logging.info(f"Executing Postgres Server query: {query} with values {values}")
     # execute and commit the query
     try:
