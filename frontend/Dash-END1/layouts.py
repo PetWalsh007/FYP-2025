@@ -18,5 +18,5 @@ app_layout = html.Div([
     dcc.Download(id="download-dataframe-csv"),  # _self used to trigger full page reload
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content'),
-    # Additional components can be added here
+    dcc.Store(id='client-ip-store', storage_type='session'),
 ], style={'fontFamily': 'Times New Roman', 'padding': '40px'})

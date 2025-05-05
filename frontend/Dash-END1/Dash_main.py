@@ -6,6 +6,7 @@ https://dash.plotly.com/ for more information on Dash and how the Dash framework
 '''
 
 import dash
+from flask import request, g
 from dash import dcc, dash_table
 from dash import html
 from dash.dependencies import Input, Output, State
@@ -147,8 +148,30 @@ except Exception as e:
 app_startup_routine()  # Call the startup routine to load the config and log the startup
      
 
+@app.server.before_request
+def capture_client_ip():
+    excluded_paths = [
+        "/_dash-layout", "/_dash-dependencies", "/_dash-update-component",
+        "/_dash-component-suites", "/favicon.ico"
+    ]
+
+    # Skip logging for these paths - startup dash calls
+    if any(request.path.startswith(path) for path in excluded_paths):
+        return
+
+    g.client_ip = request.headers.get("X-Real-IP", request.remote_addr)
+    logging.info(f"Client IP: {g.client_ip} - Method: {request.method} - Path: {request.path}")
 
 
+@app.callback(
+    Output('client-ip-store', 'data'),
+    Input('url', 'pathname'),
+    prevent_initial_call=True
+)
+def store_client_ip(_):
+    ip = request.headers.get("X-Real-IP", request.remote_addr)
+    logging.info(f"Storing client IP to dcc.Store: {ip}")
+    return ip
 
 
 def connect_redis():
@@ -699,12 +722,13 @@ def get_style(data):
      State('redis-key-entry', 'value'),
      State('processed-key-store', 'data'),
      State('processed-key-entry', 'value'),
-     State('redis-key-for-proc', 'value')],
+     State('redis-key-for-proc', 'value'),
+     State('client-ip-store', 'data')],
     prevent_initial_call=True
 )
 def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_btn, st_date, end_date, process_btn,
                    db_sel, tbl_sel, download_cts, config_button, db_add_button ,pathname, analysis_type,
-                  store_data, redis_key_store, manual_key_entry, processed_key_store, manual_processed_key_entry, to_process_key):
+                  store_data, redis_key_store, manual_key_entry, processed_key_store, manual_processed_key_entry, to_process_key,   client_ip):
 
     # fix for none type issue
     get_data_btn = int(get_data_btn or 0)
@@ -748,7 +772,7 @@ def update_output(clear_btn, get_data_btn, fetch_data_btn, fetch_processed_data_
                     redis_key_store, html.Ul([html.Li(key) for key in redis_key_store]), dash.no_update, dash.no_update,
                     dash.no_update, dash.no_update, dash.no_update, dash.no_update)
         logging.info(f"Fetching Redis Key -  DB: {db_sel}, Table: {tbl_sel}, Start Date: {st_date}, End Date: {end_date}")
-        response_json = get_data_all( db_sel, tbl_sel, st_date, end_date)  # Calls backend
+        response_json = get_data_all( db_sel, tbl_sel, st_date, end_date, client_ip)  # Calls backend
         redis_key = response_json.get("redis_key")
         db_sel_lbl = next(
                                 (item['label'] for item in CONFIG['database_options'] if item['value'] == db_sel),
@@ -1039,15 +1063,15 @@ def get_data(n_clicks, redis_key_proc):
     
     return response
 
-def get_data_all(db_sel, tbl_sel, st_date, end_date):
-    
+def get_data_all(db_sel, tbl_sel, st_date, end_date, user_ip):
+   
     #using config file to get the table name
   
     #database_table_sel = CONFIG['databases'][db_sel]['database']['table']
     endpoint_ip = CONFIG['endpoints']['db-connection-layer']['ip']
     endpoint_port = CONFIG['endpoints']['db-connection-layer']['port']
     logging.info(f"Fetching data from {endpoint_ip}:{endpoint_port}")
-    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&start={st_date}&end={end_date}') # updated to take the table name from the dropdown
+    response = requests.get(f'http://{endpoint_ip}:{endpoint_port}/data?database={db_sel}&table_name={tbl_sel}&start={st_date}&end={end_date}&user={user_ip}') # updated to take the table name from the dropdown
     response_json = response.json()
     # send response to redis first 
     logging.info(f"Response Rec: {response_json}")
