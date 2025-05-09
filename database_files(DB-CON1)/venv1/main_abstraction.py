@@ -187,12 +187,16 @@ async def lifespan(app):
             logging.error(f"Error closing connection to {db_name}: {e}")
 
 
+    try:
+        if redis_client:
+            redis_client.close()
+            logging.info("Redis connection closed.")
+        else:
+            logging.warning("Redis connection was not established.")
+    except Exception as e:
+        logging.error(f"Error closing Redis connection: {e}")
 
-    if postgres_server_con:
-        postgres_server_con.close_connection()
-    if redis_client:
-        redis_client.close()
-    
+
 
     logging.info("Database connections closed.")
     logging.info("***********************************")
