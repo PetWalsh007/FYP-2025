@@ -4,10 +4,34 @@
         "uname": "localadmin",
         "password": "localadmin",
         "port": "5432",
-        "db_name": "FYP-DB-01"
+        "db_name": "FYP-DB-01",
+        "shema": "json-config",
+        "tables": "configs"
     },
     "schema": [
         "json-config",
         "redis-data"
-    ]
+    ],
+    "endpoints": {
+        "redis-memory-store": {
+            "ip": "192.168.1.83",
+            "port": 6379
+        },
+        "db-connection-layer": {
+            "ip": "192.168.1.81",
+            "port": 8000
+        },
+        "backend-service": {
+            "ip": "192.168.1.83",
+            "port": 8000
+        },
+        "dash-frontend": {
+            "ip": "192.168.1.82",
+            "port": 8000
+        },
+        "npm-reverse-proxy": {
+            "ip": "192.168.1.87",
+            "port": 80
+        }
+    }
 }

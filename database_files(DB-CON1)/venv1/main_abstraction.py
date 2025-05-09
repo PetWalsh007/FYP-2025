@@ -20,8 +20,7 @@ import time as time
 
 logging.basicConfig(filename="fastapi_lifespan.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
-redis_host ='192.168.1.83'
-redis_port = 6379
+CONFIG_FILE = "pwd.json"
 
 
 # Updated from FASTAPI docs to use async context manager https://fastapi.tiangolo.com/advanced/events/#lifespan
@@ -65,12 +64,7 @@ def app_startup_routine():
         logging.info("***********************************")
 
 
-    try:
-        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
-        redis_client.ping()
-        logging.info("Connected to Redis server successfully.")
-    except rd.ConnectionError as e:
-        logging.error(f"Redis connection error: {e}")
+
 
     pass
 
@@ -153,6 +147,19 @@ async def lifespan(app):
     app_startup_routine()
     connect_to_external_servers()
     pull_config_data()
+
+    config_data = load_config()
+    redis_host = config_data['endpoints']['redis-memory-store']['ip']
+    redis_port = config_data['endpoints']['redis-memory-store']['port']
+    logging.info(f"Connecting to Redis server at {redis_host}:{redis_port}...")
+    try:
+        redis_client = rd.StrictRedis(host=redis_host, port=redis_port, db=0)
+        redis_client.ping()
+        logging.info("Connected to Redis server successfully.")
+    except rd.ConnectionError as e:
+        logging.error(f"Redis connection error: {e}")
+
+
     logging.info("Connecting to external databases...")
     # loop through the global db_connections dictionary and connect to the databases
     for db_name, con in db_connections.items():
@@ -192,7 +199,7 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 
-CONFIG_FILE = "pwd.json"
+
 def load_config():
     try:
         with open(CONFIG_FILE, "r") as file:
