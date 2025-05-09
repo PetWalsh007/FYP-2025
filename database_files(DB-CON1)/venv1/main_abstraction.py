@@ -152,7 +152,7 @@ async def lifespan(app):
 
     app_startup_routine()
     connect_to_external_servers()
-
+    pull_config_data()
     logging.info("Connecting to external databases...")
     # loop through the global db_connections dictionary and connect to the databases
     for db_name, con in db_connections.items():
@@ -192,6 +192,83 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 
+CONFIG_FILE = "pwd.json"
+def load_config():
+    try:
+        with open(CONFIG_FILE, "r") as file:
+            return json.load(file)
+    except Exception as e:
+        logging.error(f"Error loading config file: {e}")
+        return {}
+
+
+def load_config():
+    try:
+        with open(CONFIG_FILE, "r") as file:
+            return json.load(file)
+    except Exception as e:
+        logging.error(f"Error loading config file: {e}")
+        return {}
+
+def save_config(config_data):
+    with open(CONFIG_FILE, "w") as file:
+        json.dump(config_data, file, indent=4)
+
+
+
+def pull_config_data():
+    # function to pull the updated config data from the server db 
+
+    # send a request to the abstraction layer /healthcheck endpoint to see if tis active 
+    # if it is active then send a request to the abstraction layer /config endpoint to get the config data
+
+
+
+    config_local = load_config()
+    config_server = None
+
+
+    config_server = fetch_configuration_Data()
+    if config_server is None:
+        logging.error("Failed to fetch configuration data from server.")
+        return
+    if "error" in config_server:
+        logging.error(f"Error fetching configuration data from server: {config_server['error']}")
+        return
+    if "endpoints" not in config_server:
+        logging.error("No endpoints found in the configuration data from server.")
+        return
+
+    try:
+        # Extracting the "endpoints" section from both configurations
+        local_endpoints = config_local.get("endpoints", {})
+        server_endpoints = config_server.get("endpoints", {})
+
+        # Compare and update the local endpoints with server endpoints
+        for key, server_endpoint in server_endpoints.items():
+            if key not in local_endpoints or local_endpoints[key] != server_endpoint:
+                logging.info(f"Updating endpoint '{key}' in local config with server data.")
+                local_endpoints[key] = server_endpoint
+
+        # Save the updated endpoints back to the local configuration
+        config_local["endpoints"] = local_endpoints
+
+        # Save the updated local configuration to the config file
+        save_config(config_local)
+        logging.info("Local configuration updated successfully with server data.")
+
+    except Exception as e:
+        logging.error(f"Error updating local config with server data: {e}")
+
+
+    pass
+
+
+
+
+
+
+
 
 
 # adding health check to endpoints to help startups
@@ -201,14 +278,13 @@ async def healthcheck():
     
     return {"status": "OK"}
 
-@app.get("/config")
-async def get_config():
-    # Health check endpoint to verify if the service is running.
+def fetch_configuration_Data():
+# Health check endpoint to verify if the service is running.
     global db_connections
     global postgres_server_con
     global redis_client
 
-    logging.info("Received request for /config")
+    
     
     # Check if the Postgres Server connection is established
     if postgres_server_con.conn is None:
@@ -258,6 +334,11 @@ async def get_config():
         logging.error(f"Error fetching endpoints: {e}")
         return {"error": "Failed to fetch endpoints"}
    
+
+@app.get("/config")
+async def get_config():
+    logging.info("Received request for /config")
+    return fetch_configuration_Data()
 
 
 # https://stackoverflow.com/questions/10252010/serializing-class-instance-to-json 
