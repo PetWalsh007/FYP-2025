@@ -143,10 +143,11 @@ async def lifespan(app):
     # Runs at FastAPI startup
 
     global postgres_server_con
-
+    global redis_client
     app_startup_routine()
-    connect_to_external_servers()
-    pull_config_data()
+    if postgres_server_con is not None:
+        connect_to_external_servers()
+        pull_config_data()
 
     config_data = load_config()
     redis_host = config_data['endpoints']['redis-memory-store']['ip']
@@ -161,7 +162,7 @@ async def lifespan(app):
 
 
     logging.info("Connecting to external databases...")
-    # loop through the global db_connections dictionary and connect to the databases
+    # loop through the global db_connections dictionary and log connections 
     for db_name, con in db_connections.items():
         if con.conn is None:
             logging.error(f"Connection to {db_name} failed.")
@@ -213,13 +214,7 @@ def load_config():
         return {}
 
 
-def load_config():
-    try:
-        with open(CONFIG_FILE, "r") as file:
-            return json.load(file)
-    except Exception as e:
-        logging.error(f"Error loading config file: {e}")
-        return {}
+
 
 def save_config(config_data):
     with open(CONFIG_FILE, "w") as file:
@@ -230,9 +225,8 @@ def save_config(config_data):
 def pull_config_data():
     # function to pull the updated config data from the server db 
 
-    # send a request to the abstraction layer /healthcheck endpoint to see if tis active 
-    # if it is active then send a request to the abstraction layer /config endpoint to get the config data
 
+    # if it is active then send a request to the abstraction layer /config endpoint to get the config data
 
 
     config_local = load_config()
@@ -290,7 +284,7 @@ async def healthcheck():
     return {"status": "OK"}
 
 def fetch_configuration_Data():
-# Health check endpoint to verify if the service is running.
+
     global db_connections
     global postgres_server_con
     global redis_client
@@ -410,13 +404,15 @@ async def add_database_connection(request: Request):
         values = (endpoint_name, endpoint_type, endpoint_ip, endpoint_port, driver_name, database_name, connection_uname, connection_pwd, is_active)
         
         # Update the metadata column
-        metadata_json = json.dumps(metadata) 
-        update_query = """
-            UPDATE "Platform-Data".databases 
-            SET metadata = ?::jsonb
-            WHERE endpoint_name = ?;
-        """
-        update_values = (metadata_json, endpoint_name)
+        # if metadata is not None:
+        if metadata is not None:
+            metadata_json = json.dumps(metadata) 
+            update_query = """
+                UPDATE "Platform-Data".databases 
+                SET metadata = ?::jsonb
+                WHERE endpoint_name = ?;
+            """
+            update_values = (metadata_json, endpoint_name)
 
 
         try:
@@ -425,9 +421,10 @@ async def add_database_connection(request: Request):
 
             logging.info(f"Query executed successfully: {query}")
 
-            postgres_server_con.cursor.execute(update_query, update_values)
-            postgres_server_con.conn.commit()
-            logging.info(f"Metadata updated successfully for endpoint: {endpoint_name}")
+            if metadata is not None:
+                postgres_server_con.cursor.execute(update_query, update_values)
+                postgres_server_con.conn.commit()
+                logging.info(f"Metadata updated successfully for endpoint: {endpoint_name}")
      
             logging.info(f"Database connection added successfully: {endpoint_name}")
             return {"message": f"Database connection '{endpoint_name}' added successfully."}
@@ -528,7 +525,7 @@ async def get_data(database: str = "null",table_name: str = "null", fil_conditio
 async def get_command(rst: str = "null"):
     # receive commands and resart the server
 
-    # Code is to be updated to include a connection to server side db where rand_number is stored
+    
     if rst == 'restart_server_main_abstraction':
         subprocess.Popen(["sudo", "killall", "gunicorn"])
         
@@ -595,15 +592,12 @@ def store_query_data(key, query_table="", query_db="", reuse_qry=False, qry="", 
         return {"error": "Error executing query"}
 
 
-
-
-
     
 # Function to query SQL Server database
 async def db_query(query, con_obj):
     # standard function to query the database and return the result
     
-    logging.info(f"Received request for /sql_server")
+    logging.info(f"Received request for /db_query with query: {query}")
     if con_obj.conn is None:
         if con_obj.con_err:
             return con_obj.con_err
@@ -646,7 +640,7 @@ def send_to_redis(redis_value, redis_qry_key):
         return {"Error storing result in Redis"}
 
     
-    # first store the query in redis with the key as the query string
+	#  store the query in redis with the key as the query string - pointer to main redis key
     try:
         redis_client.set(redis_qry_key, redis_key,  ex=3600)  # Set TTL to 1 hour
         logging.info(f"Stored result in Redis with key: {redis_qry_key}")
@@ -659,7 +653,7 @@ def send_to_redis(redis_value, redis_qry_key):
 
 def open_server_db_con():
     # Open the connection to the server side database
-    logging.info("Opening connection to server side database...")
+    logging.info("IDB-Opening connection to server side database...")
     try:
         with open('pwd.json') as json_file:
             data = json.load(json_file)
@@ -671,12 +665,15 @@ def open_server_db_con():
                 connection_password=data['postgres']['password']
             )
 
-        logging.info(f"Postgres Server connection established: {postgres_con2}")
-        logging.info(f"data returned from connection: {postgres_con2.conn}, {postgres_con2.cursor}, {postgres_con2.con_err}")
-        logging.info(f"Postgres Server connection established: {postgres_con2.conn is not None}")
+        if postgres_con2.conn is None:
+            raise ConnectionError("IDB-Failed to establish a connection to the PostgreSQL server.")
+
+        logging.info(f"IDB-Postgres Server connection established: {postgres_con2}")
+        logging.info(f"IDB-data returned from connection: {postgres_con2.conn}, {postgres_con2.cursor}, {postgres_con2.con_err}")
+        logging.info(f"IDB-Postgres Server connection established: {postgres_con2.conn is not None}")
         return postgres_con2
     except Exception as e:
-        logging.error(f"Error While starting connection to backend database server: {e}")
+        logging.error(f"IDB-Error While starting connection to backend database server: {e}")
         postgres_con2 = None
         return postgres_con2
     
