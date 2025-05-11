@@ -9,8 +9,6 @@ based on the data types of the columns for processing
 
 """
 
-
-
 from typing import Dict, Any
 import numpy as np
 import pandas as pd
@@ -19,7 +17,6 @@ import logging
 
 # setup_processing_logging
 logger = logging.getLogger(__name__)
-
 
 
 # endpoints here to be defined via paramarters passed to condigure_data
@@ -33,12 +30,10 @@ def configure_data(raw_data):
     return data_dict, df
 
 
-
 def _desc_data(raw_data):
 
     logger.info("Describing data...")  # Log data description event
 
-    
     try:
         # Convert raw data to DataFrame
         
@@ -46,8 +41,6 @@ def _desc_data(raw_data):
             raw_data = raw_data.decode('utf-8')
 
         df = pd.read_json(raw_data)
-
-
 
         logger.info(f"DataFrame shape: {df.shape}")  # Log DataFrame shape
         data_column_info = []
@@ -138,7 +131,6 @@ def _desc_data(raw_data):
         time_columns = None
         time_columns = [cols_info['name'] for cols_info in data_column_info if cols_info['is_time_data']]
      
-
 
         return {
             "status": "ok",

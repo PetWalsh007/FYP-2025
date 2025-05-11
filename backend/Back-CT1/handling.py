@@ -159,11 +159,8 @@ def app_startup_routine():
         if rsp is None:
             logger.error("Error pulling config data from server")
         
-
     load_config_call()
 
-    
-    
     
     global redis_client
     redis_con_attempt = 0
@@ -186,8 +183,6 @@ def app_startup_routine():
             redis_con_attempt += 1
 
 
-
-    
         
 
 
@@ -201,7 +196,17 @@ async def lifespan(app: FastAPI):
     
     yield
     # Define Shutdown tasks
-
+    # close redis connection
+    global redis_client
+    if redis_client:
+        try:
+            redis_client.close()
+            logger.info("Redis client closed successfully.")
+        except Exception as e:
+            logger.error(f"Error closing Redis client: {e}")
+    else:
+        logger.error("Redis client is not initialized, cannot close.")
+    # Log shutdown event
     logger.info("Shutting down handling.py...")  # Log shutdown event
 
 
@@ -212,8 +217,7 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/rec_req")
 async def rec_req(redis_key: str = None):
     """
-    Function to dynamically process different types of incoming data from the redis store.
-    Operation param is sent along with the data to indicate the type of processing required.
+    Funciton to return data from the redis store to the client
     """
     try:
         data_send = get_redis_data(redis_key)
@@ -235,8 +239,24 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
     """
     Function to process the data that has been passed in the request
     """
-
+    global redis_client
+    
     logger.info(f"Processing data for redis key: {redis_key}")
+
+    # build redis key from the request
+    redis_query_key = f'{redis_key}{operation}{dual}'
+    logger.info(f"Redis query key: {redis_query_key}")
+    try:
+        # check if the key exists in redis
+        redis_value = redis_client.get(redis_query_key)
+        if redis_value:
+            logging.info(f"Key {redis_query_key} found in Redis, returning cached value.")
+
+            
+            return {"redis_key": redis_value}
+    except Exception as e:
+        logging.error(f"Error checking Redis for key {redis_query_key}: {e}")
+        return {"error": f"Error checking Redis for key {redis_query_key}"}
 
     logger.info(f"Operation requested: {operation}")
     logger.info(f"Dual processing requested: {dual}")
@@ -267,7 +287,7 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
                 if updated_data_df is None:
                     logger.error("Error in DTW processing")
                     return {"error": "Error in DTW processing"}
-                proc_key = send_processed_data_to_redis(updated_data_df)
+                proc_key = send_processed_data_to_redis(updated_data_df, redis_query_key)
                 try:
                     val = send_data_to_server_db( proc_key, redis_key, operation, flag=1)
                     try: 
@@ -290,7 +310,9 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
                 logger.error(f"Error processing dual keys: {str(e)}")
                 return {"error": f"Failed to process dual keys - {str(e)}"}
             
-        
+        else:
+            logger.error(f"Dual processing not requested")
+            return {"error": "Dual processing not requested"}
 
 
     op_data = get_redis_data(redis_key)
@@ -314,13 +336,15 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
     logger.info(f"Data info: {data_info}")
 
 
+    #-------------------------------------------
+    # Analysis build area
 
     # W.I.P - 
 
     # After getting the data info, we need a pipeline to make decisions on what to do with the data - specifically time series vs non time series data
     # We must define a check to ensure that the data we have is inlien with the requried data processing needed 
     # this in line with the required processing requested by the user 
-    # ^ update needed to handling incoming process request parameter
+    # ^ update needed to handling incoming process request parameter - completed
 
     try:
         if operation == "Smp_Daily_Avg":
@@ -332,7 +356,7 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
 
             # send data to redis store 
             logger.info(f"Sending processed data to Redis...")
-            proc_key = send_processed_data_to_redis(updated_data_df)
+            proc_key = send_processed_data_to_redis(updated_data_df, redis_query_key)
 
             try:
                 val = send_data_to_server_db( proc_key, redis_key, operation, flag=1)
@@ -362,7 +386,7 @@ def process_data(redis_key: str = None, operation: str = None, dual: bool = Fals
 
         # send data to redis store 
         logger.info(f"Sending processed data to Redis...")
-        proc_key = send_processed_data_to_redis(updated_data_df)
+        proc_key = send_processed_data_to_redis(updated_data_df, redis_query_key)
 
         try:
             val = send_data_to_server_db( proc_key, redis_key, operation, flag=1)
@@ -454,7 +478,7 @@ def json_serial(obj):
         return obj.tolist()
     raise TypeError(f"Type {type(obj)} not serializable")
 
-def send_processed_data_to_redis(data):
+def send_processed_data_to_redis(data, redis_qry_key: str = None):
     
     """
     Function to send the processed data back to the redis store
@@ -496,6 +520,14 @@ def send_processed_data_to_redis(data):
 
         redis_client.set(redis_key, json.dumps(data, default=json_serial), ex=7200)  # TTL to 2 hours
         
+
+        try:
+            # Store the redis key in the redis store
+            logger.info(f"Storing redis key in redis store")
+            redis_client.set(redis_qry_key, redis_key, ex=7200)  # TTL to 2 hours
+        except Exception as e:
+            logger.error(f"Error storing redis key in redis store: {str(e)}")
+            return {"error": "Failed to store redis key in redis store"}
 
         return redis_key
     except Exception as e:
