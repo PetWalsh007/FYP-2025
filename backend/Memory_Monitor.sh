@@ -30,9 +30,10 @@ echo "$(date) - Redis RSS Memory Usage: ${REDIS_MEMORY} MB" >> $LOG_FILE
 if (( $(echo "$REDIS_MEMORY > $THRESHOLD_MB" | bc -l) == 1 )); then
     echo "$(date) - WARNING: Redis memory usage exceeded ${THRESHOLD_MB} MB!" >> $LOG_FILE
     
-    
-    redis-cli memory purge
-    echo "$(date) - Executed MEMORY PURGE to free unused memory." >> $LOG_FILE
+    # Exclude process keys for deltions
+    redis-cli KEYS "*" | grep -v "^processed_data:" | while read key; do redis-cli DEL "$key"; done
+
+    echo "$(date) - Executed Command to free memory." >> $LOG_FILE
 
     # Check memory again
     sleep 5  # Allow time

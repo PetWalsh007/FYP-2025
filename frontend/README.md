@@ -8,14 +8,15 @@ This folder contains the code for the frontend of the application, which provide
 
 ## Components of the Frontend
 
-1. **Streamlit Application**:
+1. **Dash Application**:
+The main frontend for the platform. Allows users to interact with various data sources, graph raw data, complete analysis on various datasets and also graph processed data. The UI also allows for users to update the configuration of the front-end and add additional datasources.
 
 
 
-2. **Dash Application**:
+2. **Streamlit Application**:
+Not fully developed as part of this project, but serves as a placeholder for routing with Nginx and also to showcase the possibility of the platform interacting with multiple frontend frameworks.
 
-3. **Bokeh Application**:
 
-4. **Static Resources**:
-   - Shared assets such as HTML, CSS, and JavaScript files for styling and interactivity.
-   - Used to customise the appearance and layout of all frontend applications.
+
+
+
